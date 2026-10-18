@@ -1,0 +1,55 @@
+/* Único archivo con colores literales (sección 9.4). Valores del mockup docs/ux/mockup.html; en S4 los
+   colores de texto del tema claro se oscurecieron para cumplir contraste AA (4,5:1) sobre los cuatro fondos
+   (ver docs/DEVIATIONS.md, aclaraciones S4). contrast.test.ts lo comprueba. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-2: #f5f6f8;
+  --bg-3: #eceef2;
+  --fg: #1b1e23;
+  --muted: #646b78;
+  --border: #e5e7eb;
+  --accent: #ff6c37;
+  --accent-text: #b24b26;
+  --focus: #b24b26;
+  --on-accent: #1b1e23;
+  --ok: #107b38;
+  --warn: #a05804;
+  --err: #ce2323;
+  --info: #2461e6;
+  --patch: #7c3aed;
+  --code-bg: #f8f9fb;
+  --selection: rgba(37, 99, 235, 0.18);
+  --overlay: rgba(15, 17, 21, 0.35);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  /* Logotipo (icono de la app): iguales en los dos temas. */
+  --logo-bg: #0f1115;
+  --logo-fg: #ffffff;
+  --logo-dot: #ff6c37;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --bg-2: #171a21;
+  --bg-3: #1f232c;
+  --fg: #e6e8ec;
+  --muted: #9aa3b2;
+  --border: #272b35;
+  --accent: #ff8a5b;
+  --accent-text: #ff8a5b;
+  --focus: #ff8a5b;
+  --on-accent: #0f1115;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --err: #f87171;
+  --info: #60a5fa;
+  --patch: #a78bfa;
+  --code-bg: #12151b;
+  --selection: rgba(96, 165, 250, 0.25);
+  --overlay: rgba(0, 0, 0, 0.55);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --logo-bg: #0f1115;
+  --logo-fg: #ffffff;
+  --logo-dot: #ff6c37;
+  color-scheme: dark;
+}

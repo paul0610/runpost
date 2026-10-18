@@ -1,0 +1,24 @@
+{
+  "active_environment": null,
+  "http": {
+    "follow_redirects": true,
+    "max_redirects": 10,
+    "proxy": null,
+    "timeout_ms": 30000,
+    "user_agent": "runpost/0.1",
+    "verify_tls": true
+  },
+  "mcp": {
+    "body_max_chars": 2000,
+    "cache_responses": 50,
+    "headers_default": false,
+    "mask_secrets": true
+  },
+  "schema": 1,
+  "theme": "system",
+  "ui": {
+    "font_size": 13,
+    "lang": "es",
+    "wrap_response": true
+  }
+}

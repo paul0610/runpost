@@ -1,0 +1,74 @@
+[workspace]
+members = ["crates/runpost-core", "crates/runpost-server", "crates/runpost-mcp", "crates/runpost-cli", "apps/desktop/src-tauri"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+authors = ["Paul Rojas"]
+repository = "https://github.com/paul0610/runpost"
+
+[workspace.metadata.app]
+name = "RunPost"
+# SPEC-DEVIATION: nombres de ejecutables elegidos por Paul para evitar la colisión de mayúsculas en Windows.
+cli-bin = "runpost_mcp"
+desktop-bin = "runpost_app"
+
+[workspace.dependencies]
+anyhow = "=1.0.104"
+axum = { version = "=0.8.9", features = ["ws", "multipart"] }
+clap = { version = "=4.6.7", features = ["derive", "env"] }
+getrandom = { version = "=0.4.3", features = ["std"] }
+http = "=1.5.0"
+open = "=5.4.4"
+rmcp = { version = "=3.5.1", default-features = false, features = ["server", "client", "transport-io", "macros", "transport-streamable-http-server", "transport-streamable-http-client-reqwest"] }
+rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.154", features = ["preserve_order"] }
+serde_json_path = "=0.7.2"
+schemars = "=1.2.3"
+tokio = { version = "=1.53.3", features = ["macros", "rt-multi-thread", "net", "io-util", "sync", "signal", "time"] }
+tower-http = { version = "=0.7.1", features = ["cors"] }
+tokio-tungstenite = "=0.29.0"
+tracing = "=0.1.44"
+tracing-subscriber = { version = "=0.3.23", features = ["fmt"] }
+tauri = "=2.12.4"
+tauri-build = "=2.7.3"
+tauri-plugin-single-instance = "=2.5.4"
+tauri-plugin-window-state = "=2.5.0"
+tauri-plugin-dialog = "=2.8.3"
+tauri-plugin-clipboard-manager = "=2.5.0"
+tauri-plugin-opener = "=2.7.2"
+toml = "=0.9.8"
+tempfile = "=3.27.0"
+thiserror = "=2.0.21"
+base64 = "=0.23.1"
+bytes = "=1.12.1"
+chrono = { version = "=0.4.45", default-features = false, features = ["clock", "std"] }
+notify = "=8.2.0"
+reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "http2", "charset", "json", "multipart", "cookies", "gzip", "brotli"] }
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+url = "=2.5.8"
+uuid = { version = "=1.28.0", features = ["v4", "v7"] }
+wiremock = "=0.6.5"
+zstd = "=0.14.0"
+rquickjs = "=0.14.0"
+aws-lc-rs = { version = "=1.18.2", default-features = false, features = ["aws-lc-sys", "alloc"] }
+tokio-util = "=0.7.20"
+quick-xml = "=0.42.0"
+keyring = "=4.2.0"
+runpost-core = { path = "crates/runpost-core", version = "=0.1.0" }
+runpost-server = { path = "crates/runpost-server", version = "=0.1.0" }
+runpost-mcp = { path = "crates/runpost-mcp", version = "=0.1.0" }
+
+# Tamaño (objetivos en docs/BENCH.md): LTO completo, una sola unidad de código y optimizar por
+# tamaño, como recomienda Tauri. Compila más lento que con `lto = "thin"`, pero los binarios pesan
+# casi la mitad y la app arranca antes.
+# SPEC-DEVIATION: S7-D3: aun así el CLI pesa 16,4 MB (objetivo < 15 MB).
+[profile.release]
+strip = true
+lto = "fat"
+codegen-units = 1
+opt-level = "s"

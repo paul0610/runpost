@@ -1,0 +1,25 @@
+name: Feature request / Propuesta
+description: Suggest an improvement. / Propón una mejora.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve? / ¿Qué problema resuelve?
+      description: Describe the situation (Postman habit, agent workflow, token cost...).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal / Propuesta
+      description: What should RunPost do? For UI changes, a sketch or screenshot helps.
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope / Alcance
+      options:
+        - label: I searched the existing issues / Busqué en los issues existentes
+          required: true

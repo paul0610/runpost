@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "runpost": {
+      "command": "C:\\Users\\you\\AppData\\Local\\RunPost\\runpost_mcp.exe",
+      "args": ["mcp"],
+      "env": {
+        "RUNPOST_WORKSPACE": "C:\\Users\\you\\RunPost"
+      }
+    }
+  }
+}

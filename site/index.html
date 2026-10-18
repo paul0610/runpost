@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RunPost — the HTTP client you and your AI agent share</title>
+  <meta name="description" content="RunPost: a Postman-like desktop HTTP client with a built-in MCP server for Claude Code, Codex and other AI agents. One binary, no account, no telemetry.">
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="alternate" hreflang="es" href="es.html">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="./"><img src="assets/icon.png" width="32" height="32" alt=""><span>RunPost<span class="dot">.</span></span></a>
+      <nav aria-label="Main">
+        <a href="#install">Install</a>
+        <a href="#agents">Agents</a>
+        <a href="#mcp">MCP tools</a>
+        <a href="https://github.com/paul0610/runpost">GitHub</a>
+        <a href="es.html" lang="es">Español</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="hero">
+        <h1>The HTTP client you and your AI agent share</h1>
+        <p class="lead"><span class="claim">One binary. No account. No telemetry.</span> A Postman-like desktop app with a
+          built-in MCP server: your agent runs your saved requests with compact, masked answers, and you
+          watch every call live — and approve the risky ones.</p>
+        <div class="buttons">
+          <a class="button primary" href="https://github.com/paul0610/runpost/releases/latest">Download v0.1.0</a>
+          <a class="button" href="#agents">Connect your agent</a>
+          <a class="button" href="https://github.com/paul0610/runpost">Source on GitHub</a>
+        </div>
+        <div class="demo">
+          <img src="assets/runpost-demo.gif" width="960" height="600" alt="RunPost sending a saved request, switching to the dark theme and showing the Agent panel while Claude Code works, including an approval">
+        </div>
+      </div>
+
+      <section aria-labelledby="why">
+        <h2 id="why">Why RunPost</h2>
+        <div class="grid">
+          <div class="card"><h3>MCP built in</h3><p>13 compact tools. The agent refers to saved requests by name instead of rewriting URLs, headers and tokens; <code>select</code>, ranges and diffs keep answers small.</p></div>
+          <div class="card"><h3>Live Agent panel</h3><p>Every call of the model as a row — tool, request, status, ms, raw → sent bytes — with a token meter.</p></div>
+          <div class="card"><h3>Guardrails</h3><p>Per collection: allowed methods, approval in the app (Approve / Deny, 60 s) and calls per minute.</p></div>
+          <div class="card"><h3>Secrets out of files</h3><p>Masked for the agent, history and logs, and optionally kept in the OS keyring instead of the workspace.</p></div>
+          <div class="card"><h3>Postman habits</h3><p>Collections, environments, scripts (<code>pm.*</code>), Collection Runner, v2.1 import/export and the same shortcuts.</p></div>
+          <div class="card"><h3>Local and Git-friendly</h3><p>One binary, no account, no telemetry. One plain JSON file per collection and environment.</p></div>
+        </div>
+      </section>
+
+      <section id="install" aria-labelledby="install-title">
+        <h2 id="install-title">Install</h2>
+        <p>Builds are not code-signed yet, so the first launch asks for confirmation. Each block ends by
+          putting <code>runpost_mcp</code> (CLI and MCP server) on your <code>PATH</code>.</p>
+        <h3>Windows</h3>
+        <pre><code>Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_x64-setup.exe -OutFile RunPost-setup.exe
+.\RunPost-setup.exe
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ";$env:LOCALAPPDATA\RunPost", 'User')</code></pre>
+        <h3>macOS (Apple silicon)</h3>
+        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_aarch64.dmg
+hdiutil attach RunPost_0.1.0_aarch64.dmg &amp;&amp; cp -R /Volumes/RunPost/RunPost.app /Applications/ &amp;&amp; hdiutil detach /Volumes/RunPost
+xattr -dr com.apple.quarantine /Applications/RunPost.app &amp;&amp; sudo ln -sf /Applications/RunPost.app/Contents/MacOS/runpost_mcp /usr/local/bin/runpost_mcp</code></pre>
+        <h3>Linux (Debian / Ubuntu; also an AppImage)</h3>
+        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_amd64.deb
+sudo apt install ./RunPost_0.1.0_amd64.deb
+runpost_app</code></pre>
+      </section>
+
+      <section id="agents" aria-labelledby="agents-title">
+        <h2 id="agents-title">Connect your agent</h2>
+        <p><b>Claude Code</b> (2.1.275 or later), one line in your terminal:</p>
+        <pre><code>claude plugin install runpost --marketplace paul0610/runpost</code></pre>
+        <p>Or inside Claude Code: <code>/plugin marketplace add paul0610/runpost</code>, then
+          <code>/plugin install runpost@runpost</code>.</p>
+        <p>The plugin brings the MCP server, the <code>api-testing</code> skill and the commands
+          <code>/runpost:run</code>, <code>/runpost:suite</code> and <code>/runpost:import</code>. With the
+          app open on the same workspace, its calls show up in the Agent panel and protected requests wait for
+          your approval.</p>
+        <p><b>Codex, Claude Desktop and others</b>: in the app, <i>Agent → Connect agent ▾</i> copies a
+          ready-made config with your paths. Examples and an <code>AGENTS.md</code> for Codex are in
+          <a href="https://github.com/paul0610/runpost/tree/main/docs/mcp-client-configs">docs/mcp-client-configs</a>.</p>
+      </section>
+
+      <section id="mcp" aria-labelledby="mcp-title">
+        <h2 id="mcp-title">MCP tools</h2>
+        <p>Same tools over stdio and over Streamable HTTP (<code>http://127.0.0.1:7879/mcp</code> while the
+          app is open). Full contract: <a href="https://github.com/paul0610/runpost/blob/main/docs/MCP.md">docs/MCP.md</a>.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>ws_overview</code></td><td>Collections, environments and the active one. Call it first.</td></tr>
+              <tr><td><code>list_requests</code> · <code>search</code></td><td>Find saved requests by collection, folder or text.</td></tr>
+              <tr><td><code>get_request</code></td><td>A saved request, only the fields you ask for.</td></tr>
+              <tr><td><code>run_request</code></td><td>Run a saved request: status, ms, minified and truncated body, <code>select</code> (JSONPath).</td></tr>
+              <tr><td><code>send</code></td><td>An ad hoc request with <code>{{variables}}</code>; optionally save it.</td></tr>
+              <tr><td><code>get_response</code></td><td>Read a previous response by ranges, or <code>diff_against</code> another one or a saved reference.</td></tr>
+              <tr><td><code>run_collection</code></td><td>Run a collection or folder with its scripts: summary or only failures.</td></tr>
+              <tr><td><code>env_get</code> · <code>env_set</code></td><td>Variables (secrets as <code>***</code>; secrets go to the OS keyring).</td></tr>
+              <tr><td><code>upsert_request</code> · <code>import_postman</code></td><td>Build collections in one call or import Postman v2.1.</td></tr>
+              <tr><td><code>history</code></td><td>Recent executions with masked URLs.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Creado por <a href="https://github.com/paul0610">Paul Rojas</a> ·
+      <a href="https://github.com/paul0610/runpost">github.com/paul0610/runpost</a> · MIT license
+    </footer>
+  </div>
+</body>
+</html>

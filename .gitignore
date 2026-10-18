@@ -1,0 +1,30 @@
+/target/
+**/node_modules/
+/ui/dist/
+**/.svelte-kit/
+**/gen/schemas/
+/workspace/logs/
+/workspace/history.db*
+/workspace/*.db*
+# Entornos locales: solo fixtures falsos y exports revisados entran en Git.
+/workspace/environments/*.env.json
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+__pycache__/
+/artifacts/
+
+# Colección de ejemplo (Acme, una API ficticia; sin secretos).
+!/tests/fixtures/Acme-Gateway-Scopes.postman_collection.json
+# Documentos internos de planificación: se quedan en local, no se publican.
+/ARCHITECTURE.md
+/SPRINTS.md
+/docs/UX.md
+/docs/ux/
+/docs/DEVIATIONS.md
+/docs/sprints/
+# Copia del CLI para el instalador (la prepara el workflow de release).
+/apps/desktop/src-tauri/binaries/

@@ -1,0 +1,20 @@
+{
+  "name": "runpost",
+  "version": "0.1.0",
+  "description": "RunPost for Claude Code: run your saved API requests and collections through RunPost's MCP server (compact, masked output), plus the api-testing skill and /runpost:run, /runpost:suite, /runpost:import.",
+  "author": {
+    "name": "Paul Rojas",
+    "url": "https://github.com/paul0610"
+  },
+  "homepage": "https://github.com/paul0610/runpost",
+  "repository": "https://github.com/paul0610/runpost",
+  "license": "MIT",
+  "keywords": [
+    "api",
+    "http",
+    "postman",
+    "mcp",
+    "testing",
+    "rest"
+  ]
+}

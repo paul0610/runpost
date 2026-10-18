@@ -1,0 +1,7 @@
+# Añadir a ~/.codex/config.toml (con la app de RunPost abierta).
+# Comillas simples: cadena literal de TOML, las barras de Windows van tal cual.
+[mcp_servers.runpost]
+url = "http://127.0.0.1:7879/mcp"
+http_headers_helper = 'C:\Users\you\AppData\Local\RunPost\runpost_mcp.exe mcp-headers --port 7879'
+# Codex corta una tool a los 60 s; la espera de una aprobación en la app puede durar eso.
+tool_timeout_sec = 90

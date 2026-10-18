@@ -1,0 +1,63 @@
+/* Web de RunPost (SPRINTS S7): HTML plano, sin dependencias. Mismos colores que la app (tokens.css). */
+:root {
+  --bg: #ffffff;
+  --bg-2: #f5f6f8;
+  --fg: #1b1e23;
+  --muted: #646b78;
+  --border: #e5e7eb;
+  --accent: #ff6c37;
+  --accent-text: #b24b26;
+  --on-accent: #1b1e23;
+  --code-bg: #f8f9fb;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --bg-2: #171a21;
+    --fg: #e6e8ec;
+    --muted: #9aa3b2;
+    --border: #272b35;
+    --accent: #ff8a5b;
+    --accent-text: #ff8a5b;
+    --on-accent: #0f1115;
+    --code-bg: #12151b;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent-text); }
+a:focus-visible, .button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+code, pre { font-family: ui-monospace, Consolas, "SF Mono", monospace; font-size: 0.9em; }
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; max-width: 100%; }
+main, section, .card { min-width: 0; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; }
+.brand { font-weight: 800; font-size: 20px; letter-spacing: -0.03em; text-decoration: none; color: var(--fg); display: flex; align-items: center; gap: 10px; }
+.brand .dot { color: var(--accent); }
+.top nav { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 15px; }
+.hero { text-align: center; padding: 40px 0 24px; }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.15; margin: 0 0 14px; letter-spacing: -0.02em; }
+.hero p.lead { font-size: 19px; color: var(--muted); max-width: 720px; margin: 0 auto 26px; }
+.claim { font-weight: 700; color: var(--fg); }
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.button { display: inline-block; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); text-decoration: none; color: var(--fg); background: var(--bg-2); font-weight: 600; }
+.button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.demo { margin: 30px auto 10px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); }
+.demo img { display: block; width: 100%; height: auto; }
+section { padding: 34px 0; border-top: 1px solid var(--border); }
+section h2 { font-size: 26px; margin: 0 0 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; background: var(--bg-2); }
+.card h3 { margin: 0 0 6px; font-size: 17px; }
+.card p { margin: 0; color: var(--muted); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+footer { border-top: 1px solid var(--border); padding: 26px 0 40px; color: var(--muted); font-size: 15px; text-align: center; }
+@media (max-width: 640px) {
+  .top nav { margin-left: 0; width: 100%; gap: 4px 14px; font-size: 14px; }
+  .hero p.lead { font-size: 17px; }
+}

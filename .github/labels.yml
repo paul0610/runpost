@@ -1,0 +1,26 @@
+# Etiquetas del repositorio. Se crean una vez con
+# `python scripts/dev/github_labels.py <owner/repo>` (usa gh).
+- name: good first issue
+  color: "7057ff"
+  description: Good for newcomers / Buena para empezar
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed / Se busca ayuda
+- name: bug
+  color: "d73a4a"
+  description: Something is not working / Algo no funciona
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or request / Mejora o propuesta
+- name: documentation
+  color: "0075ca"
+  description: Docs / Documentación
+- name: mcp
+  color: "ff6c37"
+  description: MCP server, tools and agents / Servidor MCP y agentes
+- name: ui
+  color: "fbca04"
+  description: Desktop app and UI / App y UI
+- name: plugin
+  color: "5319e7"
+  description: Claude Code plugin / Plugin de Claude Code

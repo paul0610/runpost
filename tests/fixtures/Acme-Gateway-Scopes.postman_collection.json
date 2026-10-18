@@ -1,0 +1,512 @@
+{
+  "info": {
+    "_postman_id": "00000000-0000-4000-8000-0000000000c1",
+    "name": "Acme Gateway - Validación de scopes",
+    "description": "Suite para descubrir qué scope de access token necesita cada endpoint de Acme Gateway (#5 keys/local, #6 encrypt, #7 sign).\n\nUso: Runner de Postman con el entorno `Acme DESA` y el archivo de datos `tokens-matriz.csv` (una fila por token, cada token creado con UN solo permiso). Acme es una API ficticia de ejemplo: scripts/dev/mock_acme.py la simula.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 - Diagnóstico",
+      "description": "Comprueba qué scopes tiene REALMENTE el token que se está probando y que el gateway de Acme está vivo.",
+      "item": [
+        {
+          "name": "00.1 API - ¿qué scopes tiene el token?",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{apiUrl}}/v1/session",
+            "description": "Devuelve la sesión del token, incluido el arreglo `scope`. Sirve para confirmar que el token que creaste tiene exactamente los permisos que marcaste."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const label = pm.variables.get('scopeLabel') || '(sin etiqueta)';",
+                  "let body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "const s = body.session || {};",
+                  "const scopes = s.scope || [];",
+                  "pm.test(`[${label}] el token es válido en Acme (HTTP ${pm.response.code})`, () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(`[${label}] scopes reales del token: ${scopes.join(', ') || 'ninguno'}`, () => {",
+                  "    pm.expect(scopes.length, 'el token no reporta scopes').to.be.above(0);",
+                  "});",
+                  "console.log(`[${label}] scopes:`, scopes, '| expira:', s.expires, '| ipRestrict:', s.ipRestrict);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.2 Gateway - ping",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{gatewayUrl}}/v1/ping",
+            "description": "Ping local del gateway. No llama a la API de Acme ni usa token."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Se ejecuta solo en la primera iteración del Runner (no depende del token).",
+                  "if (pm.info.iteration > 0) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Gateway responde (ping)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 - Matriz de scopes (token bajo prueba)",
+      "description": "Ejecuta los 3 endpoints del gateway con el token de la variable `accessToken` (o con el de cada fila del CSV en el Runner). Verde = el scope sirve para ese endpoint.",
+      "item": [
+        {
+          "name": "#5 POST keys/local",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/{{keyType}}/keys/local",
+            "description": "Genera un par de claves EN el gateway. No llama a la API de Acme. La respuesta trae una clave privada de prueba: no la reutilices.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const label = pm.variables.get('scopeLabel') || '(sin etiqueta)';",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(`#5 keys/local con [${label}] → FUNCIONA`, () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(b).to.have.property('pub');",
+                  "});",
+                  "// La clave privada de la respuesta no se imprime en consola a propósito."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "#6 POST encrypt",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/encrypt",
+            "description": "Cifra un texto con una contraseña EN el gateway. No llama a la API de Acme.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"mensaje de prueba de scopes\",\n  \"password\": \"{{encryptPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const label = pm.variables.get('scopeLabel') || '(sin etiqueta)';",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(`#6 encrypt con [${label}] → FUNCIONA`, () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(b.encrypted, 'falta el campo encrypted').to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "#7 POST sign (sonda de autorización)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/{{currency}}/accounts/{{accountId}}/sign",
+            "description": "Sonda segura: el gateway primero lee la cuenta en la API de Acme con el token (ahí se valida el scope) y luego intenta firmar. Como NO enviamos clave, la firma falla a propósito y no se firma nada. Error de la API (401/403) = el scope no alcanza. Error local de firma = el scope sí alcanza.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"draft\": {\n    \"accountId\": \"{{accountId}}\",\n    \"payload\": \"{}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const label = pm.variables.get('scopeLabel') || '(sin etiqueta)';",
+                  "const code = pm.response.code;",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "const msg = (b.message || b.error || '').toString();",
+                  "",
+                  "// Cómo leer la respuesta de la sonda (el body va SIN clave privada a propósito):",
+                  "//  - ApiError o HTTP 401/403 -> la API RECHAZÓ leer la cuenta: el scope NO alcanza.",
+                  "//  - Error local de firma (\"key must be an object\", prv, passphrase...) -> la API SÍ dejó",
+                  "//    leer la cuenta; el gateway falló después, en su propia máquina, porque no le dimos clave.",
+                  "//    Eso significa que el scope SÍ alcanza para este endpoint.",
+                  "const rechazadoPorLaApi = b.name === 'ApiError' || code === 401 || code === 403;",
+                  "const falloLocalDeFirma = /key must be an object|private key|prv|passphrase/i.test(msg);",
+                  "",
+                  "let veredicto;",
+                  "if (code === 200 && (b.signature || b.signed)) veredicto = 'AUTORIZADO (firmó)';",
+                  "else if (rechazadoPorLaApi) veredicto = `RECHAZADO por Acme (${code}: ${msg})`;",
+                  "else if (falloLocalDeFirma) veredicto = 'AUTORIZADO (Acme dejó leer la cuenta)';",
+                  "else veredicto = `INCONCLUSO (${code}: ${msg})`;",
+                  "",
+                  "console.log(`#7 sign [${label}] -> ${veredicto}`);",
+                  "pm.test(`#7 sign con [${label}] → ${veredicto}`, () => {",
+                  "    pm.expect(veredicto.startsWith('AUTORIZADO'), veredicto).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "#7b POST sign (firma real, opcional)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/{{currency}}/accounts/{{accountId}}/sign",
+            "description": "Opcional, confirmación de punta a punta: firma un borrador real (el que devuelve tu backend). Solo firma: esta colección nunca envía la operación. Se omite sola si las variables están vacías.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"draft\": {{draftJson}},\n  \"key\": { \"encryptedKey\": \"{{userEncryptedKey}}\" },\n  \"accountPassphrase\": \"{{accountPassphrase}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Opcional: solo corre si llenaste draftJson + userEncryptedKey + accountPassphrase.",
+                  "const faltan = ['draftJson', 'userEncryptedKey', 'accountPassphrase']",
+                  "    .filter(v => !pm.variables.get(v));",
+                  "if (faltan.length) {",
+                  "    console.log('7b omitida: faltan variables ' + faltan.join(', '));",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const label = pm.variables.get('scopeLabel') || '(sin etiqueta)';",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(`#7b firma real con [${label}] → devuelve signature`, () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(b).to.have.property('signature');",
+                  "});",
+                  "// Esta colección NUNCA envía la operación firmada: solo la firma."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 - Controles negativos (sin token / token inválido)",
+      "description": "Prueban que #5 y #6 no dependen del token y que #7 sí. Solo corren en la primera iteración del Runner.",
+      "item": [
+        {
+          "name": "#5 keys/local SIN token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/{{keyType}}/keys/local",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Se ejecuta solo en la primera iteración del Runner (no depende del token).",
+                  "if (pm.info.iteration > 0) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('#5 SIN token → 200 (confirma que no requiere scope)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "#6 encrypt SIN token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/encrypt",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"mensaje de prueba\",\n  \"password\": \"{{encryptPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Se ejecuta solo en la primera iteración del Runner (no depende del token).",
+                  "if (pm.info.iteration > 0) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('#6 SIN token → 200 (confirma que no requiere scope)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "#7 sign SIN token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/{{currency}}/accounts/{{accountId}}/sign",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"draft\": {\n    \"accountId\": \"{{accountId}}\",\n    \"payload\": \"{}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Se ejecuta solo en la primera iteración del Runner (no depende del token).",
+                  "if (pm.info.iteration > 0) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('#7 SIN token → 401 (confirma que sí requiere token)', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "#7 sign token INVÁLIDO",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer TOKEN_INVALIDO_0000000000"
+              }
+            ],
+            "url": "{{gatewayUrl}}/v1/{{currency}}/accounts/{{accountId}}/sign",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"draft\": {\n    \"accountId\": \"{{accountId}}\",\n    \"payload\": \"{}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Se ejecuta solo en la primera iteración del Runner (no depende del token).",
+                  "if (pm.info.iteration > 0) { pm.execution.skipRequest(); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('#7 token INVÁLIDO → 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

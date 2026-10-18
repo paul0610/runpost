@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RunPost</title>
+    <!-- Sin <style> en este HTML: si lo hubiera, Tauri añadiría un nonce a style-src y
+         dejaría de valer 'unsafe-inline', que necesitan CodeMirror y los estilos dinámicos. -->
+    <script src="./theme-boot.js"></script>
+    <!-- RUNPOST_BACKEND -->
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

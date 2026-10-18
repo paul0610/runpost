@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Icono de RunPost: la "R" del logotipo "RunPost." con su punto naranja (mockup). Trazos propios,
+       sin fuentes de terceros. `npx tauri icon` genera desde aquí todos los tamaños. -->
+  <rect x="48" y="48" width="928" height="928" rx="208" fill="#0f1115"/>
+  <path fill="#ffffff" fill-rule="evenodd"
+        d="M262 236 H532 C668 236 742 316 742 420 C742 506 694 570 616 594 L748 788 H614 L497 606 H382 V788 H262 Z
+           M382 340 V506 H524 C586 506 620 472 620 423 C620 374 586 340 524 340 Z"/>
+  <circle cx="830" cy="738" r="64" fill="#ff6c37"/>
+</svg>

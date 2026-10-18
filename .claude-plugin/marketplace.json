@@ -1,0 +1,30 @@
+{
+  "name": "runpost",
+  "owner": {
+    "name": "Paul Rojas",
+    "url": "https://github.com/paul0610"
+  },
+  "metadata": {
+    "description": "RunPost — the HTTP client you and your agent share."
+  },
+  "plugins": [
+    {
+      "name": "runpost",
+      "source": "./plugin",
+      "description": "Run saved API requests and collections through RunPost's MCP server, with the api-testing skill and /runpost commands.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Paul Rojas"
+      },
+      "homepage": "https://github.com/paul0610/runpost",
+      "license": "MIT",
+      "keywords": [
+        "api",
+        "http",
+        "postman",
+        "mcp",
+        "testing"
+      ]
+    }
+  ]
+}

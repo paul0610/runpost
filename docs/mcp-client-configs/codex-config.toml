@@ -1,0 +1,6 @@
+# Añadir a ~/.codex/config.toml (por stdio; no necesita la app abierta).
+# Comillas simples: cadena literal de TOML, las barras de Windows van tal cual.
+[mcp_servers.runpost]
+command = 'C:\Users\you\AppData\Local\RunPost\runpost_mcp.exe'
+args = ["mcp"]
+env = { RUNPOST_WORKSPACE = 'C:\Users\you\RunPost' }

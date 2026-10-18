@@ -1,0 +1,47 @@
+name: Bug report / Error
+description: Something does not work as expected. / Algo no funciona como debería.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! English or Spanish are fine. **Never paste real tokens, passwords or
+        environments**: replace them with `***`.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / ¿Qué pasó?
+      description: Steps to reproduce, what you expected and what you got.
+      placeholder: |
+        1. Import ...
+        2. Send ...
+        3. Expected ... but got ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where? / ¿Dónde?
+      multiple: true
+      options:
+        - Desktop app (Tauri)
+        - Browser mode (serve --browser)
+        - MCP (stdio)
+        - MCP (HTTP, app open)
+        - CLI (run / import / export)
+        - Claude Code plugin
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and OS / Versión y sistema
+      placeholder: "runpost_mcp --version · Windows 11 / macOS 15 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional) / Registros (opcional)
+      description: "`workspace/logs/mcp.log` lines or the app console. Secrets are masked, but please check."
+      render: text

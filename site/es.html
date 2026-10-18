@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RunPost — el cliente HTTP que usan tú y tu agente</title>
+  <meta name="description" content="RunPost: cliente HTTP de escritorio tipo Postman con servidor MCP integrado para Claude Code, Codex y otros agentes de IA. Un binario, sin cuenta, sin telemetría.">
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="alternate" hreflang="en" href="./">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="es.html"><img src="assets/icon.png" width="32" height="32" alt=""><span>RunPost<span class="dot">.</span></span></a>
+      <nav aria-label="Principal">
+        <a href="#instalar">Instalar</a>
+        <a href="#agentes">Agentes</a>
+        <a href="#mcp">Tools MCP</a>
+        <a href="https://github.com/paul0610/runpost">GitHub</a>
+        <a href="./" lang="en">English</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="hero">
+        <h1>El cliente HTTP que usan tú y tu agente de IA</h1>
+        <p class="lead"><span class="claim">Un binario. Sin cuenta. Sin telemetría.</span> Una app de escritorio tipo Postman con
+          servidor MCP integrado: tu agente ejecuta tus peticiones guardadas con respuestas compactas y los
+          secretos tapados, y tú ves cada llamada en vivo y apruebas las delicadas.</p>
+        <div class="buttons">
+          <a class="button primary" href="https://github.com/paul0610/runpost/releases/latest">Descargar v0.1.0</a>
+          <a class="button" href="#agentes">Conectar tu agente</a>
+          <a class="button" href="https://github.com/paul0610/runpost">Código en GitHub</a>
+        </div>
+        <div class="demo">
+          <img src="assets/runpost-demo.gif" width="960" height="600" alt="RunPost enviando una petición guardada, pasando al tema oscuro y mostrando el panel Agente mientras Claude Code trabaja, con una aprobación">
+        </div>
+      </div>
+
+      <section aria-labelledby="porque">
+        <h2 id="porque">Por qué RunPost</h2>
+        <div class="grid">
+          <div class="card"><h3>MCP integrado</h3><p>13 tools compactas. El agente usa tus peticiones guardadas por nombre en vez de reescribir URL, cabeceras y tokens; <code>select</code>, rangos y diffs mantienen pequeñas las respuestas.</p></div>
+          <div class="card"><h3>Panel Agente en vivo</h3><p>Cada llamada del modelo como una fila —tool, petición, estado, ms, bytes crudos → enviados— con medidor de tokens.</p></div>
+          <div class="card"><h3>Guardarraíles</h3><p>Por colección: métodos permitidos, aprobación en la app (Aprobar / Denegar, 60 s) y límite por minuto.</p></div>
+          <div class="card"><h3>Secretos fuera de los archivos</h3><p>Tapados para el agente, el historial y los logs, y si quieres en el llavero del sistema en lugar del workspace.</p></div>
+          <div class="card"><h3>Costumbres de Postman</h3><p>Colecciones, entornos, scripts (<code>pm.*</code>), Collection Runner, importar/exportar v2.1 y los mismos atajos.</p></div>
+          <div class="card"><h3>Local y amigable con Git</h3><p>Un binario, sin cuenta, sin telemetría. Un JSON por colección y por entorno.</p></div>
+        </div>
+      </section>
+
+      <section id="instalar" aria-labelledby="instalar-titulo">
+        <h2 id="instalar-titulo">Instalar</h2>
+        <p>Los binarios aún no están firmados, así que el primer arranque pide confirmación. Cada bloque
+          termina dejando <code>runpost_mcp</code> (CLI y servidor MCP) en el <code>PATH</code>.</p>
+        <h3>Windows</h3>
+        <pre><code>Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_x64-setup.exe -OutFile RunPost-setup.exe
+.\RunPost-setup.exe
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ";$env:LOCALAPPDATA\RunPost", 'User')</code></pre>
+        <h3>macOS (Apple silicon)</h3>
+        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_aarch64.dmg
+hdiutil attach RunPost_0.1.0_aarch64.dmg &amp;&amp; cp -R /Volumes/RunPost/RunPost.app /Applications/ &amp;&amp; hdiutil detach /Volumes/RunPost
+xattr -dr com.apple.quarantine /Applications/RunPost.app &amp;&amp; sudo ln -sf /Applications/RunPost.app/Contents/MacOS/runpost_mcp /usr/local/bin/runpost_mcp</code></pre>
+        <h3>Linux (Debian / Ubuntu; también AppImage)</h3>
+        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_amd64.deb
+sudo apt install ./RunPost_0.1.0_amd64.deb
+runpost_app</code></pre>
+      </section>
+
+      <section id="agentes" aria-labelledby="agentes-titulo">
+        <h2 id="agentes-titulo">Conectar tu agente</h2>
+        <p><b>Claude Code</b> (2.1.275 o posterior), una línea en la terminal:</p>
+        <pre><code>claude plugin install runpost --marketplace paul0610/runpost</code></pre>
+        <p>O dentro de Claude Code: <code>/plugin marketplace add paul0610/runpost</code> y después
+          <code>/plugin install runpost@runpost</code>.</p>
+        <p>El plugin trae el servidor MCP, la skill <code>api-testing</code> y los comandos
+          <code>/runpost:run</code>, <code>/runpost:suite</code> y <code>/runpost:import</code>. Con la app
+          abierta sobre el mismo workspace, sus llamadas aparecen en el panel Agente y las peticiones
+          protegidas esperan tu aprobación.</p>
+        <p><b>Codex, Claude Desktop y otros</b>: en la app, <i>Agente → Conectar agente ▾</i> copia la
+          configuración con tus rutas. Ejemplos y un <code>AGENTS.md</code> para Codex en
+          <a href="https://github.com/paul0610/runpost/tree/main/docs/mcp-client-configs">docs/mcp-client-configs</a>.</p>
+      </section>
+
+      <section id="mcp" aria-labelledby="mcp-titulo">
+        <h2 id="mcp-titulo">Tools MCP</h2>
+        <p>Las mismas por stdio y por Streamable HTTP (<code>http://127.0.0.1:7879/mcp</code> con la app
+          abierta). Contrato completo: <a href="https://github.com/paul0610/runpost/blob/main/docs/MCP.md">docs/MCP.md</a>.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tool</th><th>Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td><code>ws_overview</code></td><td>Colecciones, entornos y el activo. La primera llamada.</td></tr>
+              <tr><td><code>list_requests</code> · <code>search</code></td><td>Busca peticiones guardadas por colección, carpeta o texto.</td></tr>
+              <tr><td><code>get_request</code></td><td>Una petición guardada, solo los campos pedidos.</td></tr>
+              <tr><td><code>run_request</code></td><td>Ejecuta una petición guardada: estado, ms, cuerpo minificado y truncado, <code>select</code> (JSONPath).</td></tr>
+              <tr><td><code>send</code></td><td>Una petición suelta con <code>{{variables}}</code>; se puede guardar.</td></tr>
+              <tr><td><code>get_response</code></td><td>Lee una respuesta anterior por rangos, o <code>diff_against</code> otra o una referencia guardada.</td></tr>
+              <tr><td><code>run_collection</code></td><td>Ejecuta una colección o carpeta con sus scripts: resumen o solo fallos.</td></tr>
+              <tr><td><code>env_get</code> · <code>env_set</code></td><td>Variables (secretos como <code>***</code>; los secretos van al llavero del sistema).</td></tr>
+              <tr><td><code>upsert_request</code> · <code>import_postman</code></td><td>Crea colecciones en una llamada o importa Postman v2.1.</td></tr>
+              <tr><td><code>history</code></td><td>Ejecuciones recientes con las URL enmascaradas.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Creado por <a href="https://github.com/paul0610">Paul Rojas</a> ·
+      <a href="https://github.com/paul0610/runpost">github.com/paul0610/runpost</a> · licencia MIT
+    </footer>
+  </div>
+</body>
+</html>

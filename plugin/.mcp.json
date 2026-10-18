@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "runpost": {
+      "command": "runpost_mcp",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

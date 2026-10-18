@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "runpost": {
+      "type": "http",
+      "url": "http://127.0.0.1:7879/mcp",
+      "headersHelper": "C:\\Users\\you\\AppData\\Local\\RunPost\\runpost_mcp.exe mcp-headers --port 7879"
+    }
+  }
+}
