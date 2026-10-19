@@ -38,6 +38,19 @@ impl Api {
         }
     }
 
+    /// Con un llavero en memoria: lo que se guarde en él no toca el del sistema.
+    async fn start_memory_keyring() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        let keyring = std::sync::Arc::new(runpost_core::secrets::MemoryKeyring::new());
+        let workspace = Workspace::open_with_keyring(dir.path(), keyring).unwrap();
+        let server = runpost_server::start(workspace, None).await.unwrap();
+        Self {
+            server,
+            client: Client::new(),
+            _dir: dir,
+        }
+    }
+
     fn url(&self, path: &str) -> String {
         format!("http://127.0.0.1:{}/api{path}", self.server.port)
     }
@@ -1025,5 +1038,131 @@ async fn import_insomnia_and_bruno() {
         .await;
     assert_eq!(again["reports"][0]["replaced"], true);
     assert_eq!(again["reports"][0]["id"], result["reports"][0]["id"]);
+    api.server.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn oauth2_tokens_from_the_api() {
+    let api = Api::start_memory_keyring().await;
+    let idp = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .and(wiremock::matchers::body_string_contains(
+            "grant_type=client_credentials",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            json!({"access_token": "fake-cc-token", "token_type": "Bearer", "expires_in": 600}),
+        ))
+        .mount(&idp)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .and(wiremock::matchers::body_string_contains(
+            "grant_type=authorization_code",
+        ))
+        .and(wiremock::matchers::body_string_contains("code=fake-code"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": "fake-user-token", "refresh_token": "fake-refresh",
+            "token_type": "Bearer", "expires_in": 600
+        })))
+        .mount(&idp)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/me"))
+        .and(header("authorization", "Bearer fake-user-token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"me": "acme"})))
+        .mount(&idp)
+        .await;
+    let draft =
+        |auth: Value| json!({"method": "GET", "url": format!("{}/v1/me", idp.uri()), "auth": auth});
+
+    // Client credentials: estado, pedir, olvidar. Nunca sale el token.
+    let cc = draft(
+        json!({"type": "oauth2_cc", "token_url": format!("{}/oauth/token", idp.uri()),
+                          "client_id": "acme", "client_secret": "fake-secret", "scope": ""}),
+    );
+    let call = |action: &str| json!({"request": cc.clone(), "action": action});
+    assert_eq!(
+        api.ok(Method::POST, "/oauth2", Some(call("status"))).await["token"],
+        Value::Null
+    );
+    let got = api.ok(Method::POST, "/oauth2", Some(call("get"))).await;
+    assert_eq!(got["token"]["token_type"], "Bearer", "{got}");
+    assert!(got["token"]["expires_at"].is_number());
+    assert!(!got.to_string().contains("fake-cc-token"));
+    assert_eq!(
+        api.ok(Method::POST, "/oauth2", Some(call("status"))).await["token"]["refresh"],
+        false
+    );
+    assert_eq!(
+        api.ok(Method::POST, "/oauth2", Some(call("clear"))).await["token"],
+        Value::Null
+    );
+    let (status, error) = api
+        .call(
+            Method::POST,
+            "/oauth2",
+            Some(json!({"request": draft(json!({"type": "none"}))})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{error}");
+
+    // Authorization code: la API devuelve la URL (sin abrir el navegador en la prueba), el
+    // "navegador" vuelve al callback local y `flows/{id}` da el resultado.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let code = draft(
+        json!({"type": "oauth2_code", "auth_url": format!("{}/authorize", idp.uri()),
+                            "token_url": format!("{}/oauth/token", idp.uri()), "client_id": "acme-app",
+                            "client_secret": "", "scope": "openid",
+                            "redirect_uri": format!("http://127.0.0.1:{port}/callback")}),
+    );
+    let started = api
+        .ok(
+            Method::POST,
+            "/oauth2",
+            Some(json!({"request": code.clone(), "action": "get", "open": false})),
+        )
+        .await;
+    let flow = started["flow"].as_str().unwrap().to_owned();
+    let url = reqwest::Url::parse(started["authorization_url"].as_str().unwrap()).unwrap();
+    let state = url
+        .query_pairs()
+        .find(|(k, _)| k == "state")
+        .map(|(_, v)| v.into_owned())
+        .unwrap();
+    let waiting = {
+        let client = api.client.clone();
+        let url = api.url(&format!("/oauth2/flows/{flow}"));
+        let token = api.server.token.expose().to_owned();
+        tokio::spawn(async move {
+            let response = client
+                .get(url)
+                .header(TOKEN_HEADER, token)
+                .send()
+                .await
+                .unwrap();
+            (response.status(), response.json::<Value>().await.unwrap())
+        })
+    };
+    let page = reqwest::get(format!(
+        "http://127.0.0.1:{port}/callback?code=fake-code&state={state}"
+    ))
+    .await
+    .unwrap();
+    assert_eq!(page.status(), StatusCode::OK);
+    let (status, done) = waiting.await.unwrap();
+    assert_eq!(status, StatusCode::OK, "{done}");
+    assert_eq!(done["token"]["refresh"], true);
+
+    // El envío usa el token sin que lo vea nadie.
+    let sent = api
+        .ok(Method::POST, "/send", Some(json!({"request": code})))
+        .await;
+    assert_eq!(sent["response"]["status"], 200, "{sent}");
+    assert!(!sent.to_string().contains("fake-user-token"));
     api.server.shutdown().await.unwrap();
 }

@@ -73,11 +73,16 @@ fn auth(entry: Option<&Value>, shared: &mut Shared, missing: &str) {
         Some(Value::String(mode)) => shared.auth_mode = mode.clone(),
         Some(Value::Object(map)) => {
             let kind = text(map.get("type"));
-            let mut attrs: HashMap<String, String> = map
-                .iter()
-                .filter(|(key, _)| key.as_str() != "type")
-                .map(|(key, value)| (key.clone(), text(Some(value))))
-                .collect();
+            let mut attrs: HashMap<String, String> = HashMap::new();
+            for (key, value) in map.iter().filter(|(key, _)| key.as_str() != "type") {
+                // OAuth 2.0 anida `credentials {clientId, clientSecret, placement}`.
+                if let Value::Object(inner) = value {
+                    for (inner_key, inner_value) in inner {
+                        attrs.insert(format!("{key}.{inner_key}"), text(Some(inner_value)));
+                    }
+                }
+                attrs.insert(key.clone(), text(Some(value)));
+            }
             if kind == "apikey" && attrs.get("placement").is_some_and(|p| p == "query") {
                 attrs.insert("placement".into(), "queryparams".into());
             }

@@ -11,8 +11,8 @@ use anyhow::{Result, bail};
 use serde_json::{Map, Value, json};
 
 use crate::model::{
-    ApiKeyIn, Auth, Body, Collection, FieldKind, Folder, Item, KeyValue, MultipartField, RawLang,
-    Request, Variable,
+    ApiKeyIn, Auth, Body, ClientAuth, Collection, FieldKind, Folder, Item, KeyValue,
+    MultipartField, OAUTH_REDIRECT_URI, OAuth2Cc, OAuth2Code, RawLang, Request, Variable,
 };
 
 use super::{Imported, array, text};
@@ -208,9 +208,59 @@ fn scheme_auth(
                 location,
             })
         }
-        "oauth2" | "openIdConnect" => {
+        "oauth2" => {
+            let flows = scheme.get("flows");
+            let scopes = |flow: &Value| {
+                flow.get("scopes")
+                    .and_then(Value::as_object)
+                    .map(|scopes| scopes.keys().cloned().collect::<Vec<_>>().join(" "))
+                    .unwrap_or_default()
+            };
+            // Una URL relativa cuelga del servidor.
+            let absolute = |url: String| {
+                if url.starts_with('/') {
+                    format!("{{{{baseUrl}}}}{url}")
+                } else {
+                    url
+                }
+            };
+            let client_credentials = flows.and_then(|f| f.get("clientCredentials"));
+            let authorization_code = flows.and_then(|f| f.get("authorizationCode"));
+            if client_credentials.is_none() && authorization_code.is_none() {
+                warnings.push(format!(
+                    "security scheme {name}: OAuth 2.0 flow not supported (only clientCredentials and authorizationCode): set as Bearer {{{{accessToken}}}}"
+                ));
+                return Some(Auth::Bearer {
+                    token: secret("accessToken"),
+                });
+            }
+            let client_secret = secret("clientSecret");
+            vars.insert("clientId".into(), false);
+            let client_id = "{{clientId}}".to_owned();
+            // Client credentials no necesita navegador: va primero si hay los dos.
+            Some(match (client_credentials, authorization_code) {
+                (Some(flow), _) => Auth::oauth2_cc(OAuth2Cc {
+                    token_url: absolute(text(flow.get("tokenUrl"))),
+                    client_id,
+                    client_secret,
+                    scope: scopes(flow),
+                    client_auth: ClientAuth::Basic,
+                }),
+                (None, Some(flow)) => Auth::oauth2_code(OAuth2Code {
+                    auth_url: absolute(text(flow.get("authorizationUrl"))),
+                    token_url: absolute(text(flow.get("tokenUrl"))),
+                    client_id,
+                    client_secret,
+                    scope: scopes(flow),
+                    redirect_uri: OAUTH_REDIRECT_URI.to_owned(),
+                    client_auth: ClientAuth::Basic,
+                }),
+                (None, None) => unreachable!("checked above"),
+            })
+        }
+        "openIdConnect" => {
             warnings.push(format!(
-                "security scheme {name} ({kind}): set as Bearer {{{{accessToken}}}}"
+                "security scheme {name} (openIdConnect): set as Bearer {{{{accessToken}}}}"
             ));
             Some(Auth::Bearer {
                 token: secret("accessToken"),

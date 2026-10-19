@@ -1,6 +1,8 @@
 //! Motor HTTP: de `Request` (nativo) a petición real con `reqwest`, y de vuelta a `Response`.
 
 pub mod auth;
+pub mod digest;
+pub mod oauth;
 
 use std::{
     collections::HashMap,
@@ -30,6 +32,8 @@ pub struct Prepared {
     pub body: PreparedBody,
     pub timeout: Duration,
     pub client: ClientKey,
+    /// Auth digest: credenciales para contestar al reto 401 (segundo intento de `send`).
+    pub digest: Option<digest::Credentials>,
 }
 
 #[derive(Clone)]
@@ -90,6 +94,9 @@ pub struct Response {
     pub ms: u64,
     pub size: u64,
     pub cookies: Vec<ResponseCookie>,
+    /// Cabecera `Authorization` del segundo intento digest (con el `response`), si lo hubo.
+    #[serde(skip)]
+    pub digest_authorization: Option<String>,
 }
 
 fn lossy_text<S: serde::Serializer>(body: &Bytes, serializer: S) -> Result<S::Ok, S::Error> {
@@ -215,6 +222,13 @@ pub fn build_request(
 
     // La auth del panel Auth gana a una cabecera manual con el mismo nombre.
     let applied = auth::apply(auth, resolver, &mut masker, &mut unresolved);
+    let digest = match auth {
+        Auth::Digest { username, password } => Some(digest::Credentials {
+            username: resolve(username, &mut unresolved),
+            password: resolve(password, &mut unresolved),
+        }),
+        _ => None,
+    };
     if let Some((name, value)) = applied.header {
         set_header(&mut headers, &name, value);
     }
@@ -350,6 +364,7 @@ pub fn build_request(
             max_redirects: http.max_redirects,
             proxy: http.proxy.clone().filter(|p| !p.trim().is_empty()),
         },
+        digest,
     };
     Ok((prepared, resolved, masker))
 }
@@ -401,16 +416,56 @@ impl Clients {
     }
 }
 
-/// Envía la petición y lee el cuerpo completo.
+/// Envía la petición y lee el cuerpo completo. Con auth digest, un 401 con reto digest se
+/// contesta con un segundo intento firmado (`Response::digest_authorization`).
 pub async fn send(
     client: &reqwest::Client,
     prepared: &Prepared,
+) -> Result<Response, reqwest::Error> {
+    let first = send_once(client, prepared, None).await?;
+    let Some(credentials) = &prepared.digest else {
+        return Ok(first);
+    };
+    if first.status != 401 {
+        return Ok(first);
+    }
+    let Some(challenge) = digest::challenge(&first.headers) else {
+        return Ok(first);
+    };
+    let mut uri = prepared.url.path().to_owned();
+    if let Some(query) = prepared.url.query() {
+        uri.push('?');
+        uri.push_str(query);
+    }
+    let header = digest::authorization(
+        &challenge,
+        credentials,
+        prepared.method.as_str(),
+        &uri,
+        &digest::cnonce(),
+    );
+    let mut second = send_once(client, prepared, Some(&header)).await?;
+    second.ms += first.ms;
+    second.digest_authorization = Some(header);
+    Ok(second)
+}
+
+async fn send_once(
+    client: &reqwest::Client,
+    prepared: &Prepared,
+    authorization: Option<&str>,
 ) -> Result<Response, reqwest::Error> {
     let mut builder = client
         .request(prepared.method.clone(), prepared.url.clone())
         .timeout(prepared.timeout);
     for (name, value) in &prepared.headers {
+        if authorization.is_some() && name.eq_ignore_ascii_case("authorization") {
+            continue;
+        }
         builder = builder.header(name.as_str(), value.as_str());
+    }
+    if let Some(value) = authorization {
+        builder = builder.header("Authorization", value);
     }
     builder = match &prepared.body {
         PreparedBody::None => builder,
@@ -460,6 +515,7 @@ pub async fn send(
         body,
         ms: started.elapsed().as_millis() as u64,
         cookies,
+        digest_authorization: None,
     })
 }
 

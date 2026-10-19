@@ -116,6 +116,12 @@ impl Resolver {
         self
     }
 
+    /// Un secreto que no viene de una variable (p. ej. un token OAuth 2.0): se enmascara igual.
+    pub fn with_secret(mut self, secret: &str) -> Self {
+        self.masker.add(secret);
+        self
+    }
+
     pub fn masker(&self) -> &Masker {
         &self.masker
     }

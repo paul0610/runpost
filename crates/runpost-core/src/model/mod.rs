@@ -113,7 +113,79 @@ pub enum ApiKeyIn {
     Query,
 }
 
-/// Autenticación (5.4). `oauth2_cc` llega en la fase 4.
+/// Cómo se presenta el cliente OAuth 2.0 al pedir el token: cabecera Basic (la que exige el
+/// RFC 6749 a todo servidor) o `client_id`/`client_secret` en el cuerpo.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ClientAuth {
+    #[default]
+    Basic,
+    Body,
+}
+
+impl ClientAuth {
+    fn is_basic(&self) -> bool {
+        *self == Self::Basic
+    }
+}
+
+/// Callback local por defecto del authorization code (RFC 8252: dirección de loopback).
+pub const OAUTH_REDIRECT_URI: &str = "http://127.0.0.1:7880/callback";
+
+fn oauth_redirect_uri() -> String {
+    OAUTH_REDIRECT_URI.to_owned()
+}
+
+/// OAuth 2.0 client credentials: el token se pide solo y se renueva al caducar.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OAuth2Cc {
+    #[serde(default)]
+    pub token_url: String,
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default)]
+    pub client_secret: String,
+    #[serde(default)]
+    pub scope: String,
+    #[serde(default, skip_serializing_if = "ClientAuth::is_basic")]
+    pub client_auth: ClientAuth,
+}
+
+/// OAuth 2.0 authorization code con PKCE: el usuario inicia sesión en el navegador y el servidor
+/// vuelve a `redirect_uri` (un puerto de 127.0.0.1 que escucha RunPost).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OAuth2Code {
+    #[serde(default)]
+    pub auth_url: String,
+    #[serde(default)]
+    pub token_url: String,
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default)]
+    pub client_secret: String,
+    #[serde(default)]
+    pub scope: String,
+    #[serde(default = "oauth_redirect_uri")]
+    pub redirect_uri: String,
+    #[serde(default, skip_serializing_if = "ClientAuth::is_basic")]
+    pub client_auth: ClientAuth,
+}
+
+impl Default for OAuth2Code {
+    fn default() -> Self {
+        Self {
+            auth_url: String::new(),
+            token_url: String::new(),
+            client_id: String::new(),
+            client_secret: String::new(),
+            scope: String::new(),
+            redirect_uri: oauth_redirect_uri(),
+            client_auth: ClientAuth::Basic,
+        }
+    }
+}
+
+/// Autenticación (5.4). Fase 4: `digest`, `oauth2_cc` y `oauth2_code`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Auth {
@@ -139,6 +211,32 @@ pub enum Auth {
         #[serde(default, rename = "in")]
         location: ApiKeyIn,
     },
+    /// Digest (RFC 7616): la petición sale sin credenciales y, ante el reto 401, se repite firmada.
+    Digest {
+        #[serde(default)]
+        username: String,
+        #[serde(default)]
+        password: String,
+    },
+    /// En una caja, como las dos de OAuth 2.0: `Auth` va en cada petición y carpeta.
+    #[serde(rename = "oauth2_cc")]
+    OAuth2Cc(Box<OAuth2Cc>),
+    #[serde(rename = "oauth2_code")]
+    OAuth2Code(Box<OAuth2Code>),
+}
+
+impl Auth {
+    pub fn oauth2_cc(config: OAuth2Cc) -> Self {
+        Self::OAuth2Cc(Box::new(config))
+    }
+
+    pub fn oauth2_code(config: OAuth2Code) -> Self {
+        Self::OAuth2Code(Box::new(config))
+    }
+
+    pub fn is_oauth2(&self) -> bool {
+        matches!(self, Self::OAuth2Cc(_) | Self::OAuth2Code(_))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -656,10 +754,32 @@ mod tests {
             json!({"type":"bearer","token":"{{accessToken}}"}),
             json!({"type":"basic","username":"u","password":"p"}),
             json!({"type":"apikey","key":"X-Api-Key","value":"v","in":"query"}),
+            json!({"type":"digest","username":"u","password":"{{pass}}"}),
+            // 5.4: client credentials tal cual; `client_auth` solo aparece si no es `basic`.
+            json!({"type":"oauth2_cc","token_url":"https://id.example.test/token",
+                   "client_id":"c","client_secret":"{{secret}}","scope":"a b"}),
+            json!({"type":"oauth2_cc","token_url":"t","client_id":"c","client_secret":"s",
+                   "scope":"","client_auth":"body"}),
+            json!({"type":"oauth2_code","auth_url":"https://id.example.test/authorize",
+                   "token_url":"https://id.example.test/token","client_id":"c",
+                   "client_secret":"","scope":"openid","redirect_uri":"http://127.0.0.1:7880/callback"}),
         ] {
             let parsed: Auth = round_trip(auth.clone());
             assert_eq!(serde_json::to_value(&parsed).unwrap(), auth);
         }
+        let code: Auth = serde_json::from_value(json!({"type": "oauth2_code"})).unwrap();
+        assert_eq!(code, Auth::oauth2_code(OAuth2Code::default()));
+        let Auth::OAuth2Code(config) = &code else {
+            panic!("oauth2_code")
+        };
+        assert_eq!(config.redirect_uri, OAUTH_REDIRECT_URI);
+        assert!(code.is_oauth2());
+        // La caja no cambia el tamaño de `Auth`: sigue siendo el de las demás.
+        assert!(
+            std::mem::size_of::<Auth>() <= 64,
+            "{}",
+            std::mem::size_of::<Auth>()
+        );
     }
 
     #[test]

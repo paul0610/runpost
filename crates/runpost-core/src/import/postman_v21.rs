@@ -5,8 +5,9 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::model::{
-    ApiKeyIn, Auth, Body, Collection, Environment, FieldKind, Folder, Item, KeyValue,
-    MultipartField, RawLang, Request, RequestSettings, SCHEMA, Scripts, Variable, new_id,
+    ApiKeyIn, Auth, Body, ClientAuth, Collection, Environment, FieldKind, Folder, Item, KeyValue,
+    MultipartField, OAuth2Cc, OAuth2Code, RawLang, Request, RequestSettings, SCHEMA, Scripts,
+    Variable, new_id,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -170,6 +171,45 @@ fn auth(value: Option<&Value>, at: &str, warnings: &mut Vec<String>) -> Option<A
                 ApiKeyIn::Header
             },
         },
+        "digest" => Auth::Digest {
+            username: auth_attr(auth, "digest", "username"),
+            password: auth_attr(auth, "digest", "password"),
+        },
+        "oauth2" => {
+            let attr = |key: &str| auth_attr(auth, "oauth2", key);
+            let client_auth = if attr("client_authentication") == "body" {
+                ClientAuth::Body
+            } else {
+                ClientAuth::Basic
+            };
+            match attr("grant_type").as_str() {
+                "client_credentials" => Auth::oauth2_cc(OAuth2Cc {
+                    token_url: attr("accessTokenUrl"),
+                    client_id: attr("clientId"),
+                    client_secret: attr("clientSecret"),
+                    scope: attr("scope"),
+                    client_auth,
+                }),
+                // Sin `grant_type`, Postman usa authorization code.
+                "" | "authorization_code" | "authorization_code_with_pkce" => {
+                    Auth::oauth2_code(OAuth2Code {
+                        auth_url: attr("authUrl"),
+                        token_url: attr("accessTokenUrl"),
+                        client_id: attr("clientId"),
+                        client_secret: attr("clientSecret"),
+                        scope: attr("scope"),
+                        redirect_uri: super::local_redirect(&attr("redirect_uri"), at, warnings),
+                        client_auth,
+                    })
+                }
+                grant => {
+                    warnings.push(format!(
+                        "{at}: OAuth 2.0 grant {grant:?} not supported (only client credentials and authorization code), imported as none"
+                    ));
+                    Auth::None
+                }
+            }
+        }
         other => {
             warnings.push(format!(
                 "{at}: auth {other:?} not supported yet, imported as none"
@@ -471,7 +511,7 @@ mod tests {
                   "body": {"mode": "graphql", "graphql": {"query": "{a}", "variables": "{}"}}}},
                {"name": "raw", "request": {"method": "POST", "url": "{{base}}/r",
                   "body": {"mode": "raw", "raw": "<a/>", "options": {"raw": {"language": "xml"}}},
-                  "auth": {"type": "oauth2"}}},
+                  "auth": {"type": "hawk"}}},
                {"name": "short", "request": "http://short"},
                {"name": "built", "request": {"url": {"protocol": "https", "host": ["api", "x", "com"], "path": ["v1", "u"],
                                                       "variable": [{"key": "id"}]}}}

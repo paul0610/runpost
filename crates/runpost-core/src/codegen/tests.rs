@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    model::{KeyValue, MultipartField, Variable},
+    model::{KeyValue, MultipartField, OAuth2Cc, Variable},
     vars::Scope,
 };
 
@@ -372,4 +372,39 @@ fn language_names() {
             .iter()
             .all(|l| Lang::parse(l.as_str()) == Some(*l))
     );
+}
+
+#[test]
+fn digest_and_oauth2_snippets_never_carry_the_secret() {
+    let request = req("GET");
+    let digest = Auth::Digest {
+        username: "{{user}}".into(),
+        password: "{{token}}".into(),
+    };
+    let curl = render(Lang::Curl, &request, &digest, &resolver());
+    assert!(curl.contains("--digest --user 'ana:{{token}}'"), "{curl}");
+    let python = render(Lang::Python, &request, &digest, &resolver());
+    assert!(python.contains("from requests.auth import HTTPDigestAuth"));
+    assert!(python.contains("auth = HTTPDigestAuth(\"ana\", \"{{token}}\")"));
+    let powershell = render(Lang::Powershell, &request, &digest, &resolver());
+    assert!(
+        powershell.contains("-Credential $credential"),
+        "{powershell}"
+    );
+    let fetch = render(Lang::Fetch, &request, &digest, &resolver());
+    assert!(fetch.starts_with("// Digest auth: fetch cannot answer the challenge"));
+
+    let oauth = Auth::oauth2_cc(OAuth2Cc {
+        token_url: "{{base}}/oauth/token".into(),
+        client_id: "acme".into(),
+        client_secret: "{{token}}".into(),
+        scope: String::new(),
+        client_auth: crate::model::ClientAuth::Basic,
+    });
+    for lang in Lang::ALL {
+        let code = render(lang, &request, &oauth, &resolver());
+        assert!(code.contains("Bearer {{access_token}}"), "{lang:?}: {code}");
+        assert!(code.contains("OAuth 2.0: {{access_token}} is the token"));
+        assert!(!code.contains("s3cr3t"));
+    }
 }

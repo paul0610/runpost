@@ -21,6 +21,10 @@ pub enum CoreError {
     /// El llavero del sistema no está disponible o falló. Nunca lleva el secreto.
     #[error("keyring: {0}")]
     Keyring(String),
+    /// OAuth 2.0: falta el token, el servidor de autorización lo negó o la configuración no vale.
+    /// Nunca lleva tokens ni el secreto del cliente.
+    #[error("OAuth 2.0: {0}")]
+    OAuth(String),
 }
 
 impl CoreError {
@@ -39,6 +43,7 @@ impl CoreError {
             Self::UnsupportedSchema { .. } => "unsupported_schema".into(),
             Self::InvalidRequest(_) => "invalid_request".into(),
             Self::Keyring(_) => "keyring".into(),
+            Self::OAuth(_) => "oauth2".into(),
         }
     }
 }

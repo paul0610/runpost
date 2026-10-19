@@ -1,4 +1,5 @@
-//! Auth: none, inherit, bearer, basic, apikey (header/query).
+//! Auth: none, inherit, bearer, basic, apikey (header/query). Digest firma el segundo intento en
+//! `engine::send`; OAuth 2.0 llega aquí ya convertida en bearer (`executor`, con `engine::oauth`).
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 
@@ -48,7 +49,11 @@ pub fn apply(
         resolved
     };
     match auth {
-        Auth::None | Auth::Inherit => Applied::default(),
+        Auth::None
+        | Auth::Inherit
+        | Auth::Digest { .. }
+        | Auth::OAuth2Cc(_)
+        | Auth::OAuth2Code(_) => Applied::default(),
         Auth::Bearer { token } => {
             let token = resolve(token);
             if token.text.is_empty() {

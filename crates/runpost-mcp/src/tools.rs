@@ -119,8 +119,29 @@ fn body_from(value: &Value) -> Body {
 fn auth_from(value: &Value) -> Result<Auth, Value> {
     serde_json::from_value(value.clone()).map_err(|e| {
         json!({"error": "invalid_auth", "msg": e.to_string(),
-               "hint": "types: none,inherit,bearer{token},basic{username,password},apikey{key,value,in}"})
+               "hint": "types: none,inherit,bearer{token},basic{username,password},apikey{key,value,in},digest{username,password},oauth2_cc{token_url,client_id,client_secret,scope}"})
     })
+}
+
+/// Credenciales de una auth escritas tal cual (no `{{variable}}`): el agente ve `***`.
+fn redact_auth(auth: &mut Value) {
+    let Value::Object(map) = auth else {
+        return;
+    };
+    let is_apikey = map.get("type").and_then(Value::as_str) == Some("apikey");
+    for (key, value) in map.iter_mut() {
+        let sensitive = matches!(key.as_str(), "password" | "client_secret" | "token")
+            || (is_apikey && key == "value");
+        let Value::String(text) = value else {
+            continue;
+        };
+        let template = text.trim().starts_with("{{")
+            && text.trim().ends_with("}}")
+            && text.trim().matches("{{").count() == 1;
+        if sensitive && !text.is_empty() && !template {
+            *text = "***".into();
+        }
+    }
 }
 
 /// Busca o crea la carpeta `a/b/c` dentro de `items`.
@@ -211,6 +232,13 @@ impl Tools {
             cache: Arc::new(Mutex::new(VecDeque::new())),
             hub: None,
         }
+    }
+
+    /// El mismo motor que la app (sus clientes HTTP y sus tokens OAuth 2.0), para que el agente y
+    /// la UI no pidan cada uno su token ni se pisen al renovarlo.
+    pub fn with_executor(mut self, executor: Arc<Executor>) -> Self {
+        self.executor = executor;
+        self
     }
 
     /// Las peticiones protegidas se preguntan en la app en vez de rechazarse.
@@ -516,7 +544,11 @@ impl Tools {
         out.insert("id".into(), json!(request.id));
         for field in fields {
             if let Some(value) = full.get(&field) {
-                out.insert(field, value.clone());
+                let mut value = value.clone();
+                if field == "auth" {
+                    redact_auth(&mut value);
+                }
+                out.insert(field, value);
             }
         }
         Ok(Value::Object(out))

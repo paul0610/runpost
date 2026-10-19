@@ -956,3 +956,18 @@ describe('importar (fase 4)', () => {
     expect(await store.importText('   ')).toBe(false);
   });
 });
+
+describe('OAuth 2.0 (fase 4)', () => {
+  it('pide el estado, el token y espera el inicio de sesión sin ver nunca el token', async () => {
+    store.settings = { active_environment: 'env_1' } as Settings;
+    const token = { token_type: 'Bearer', expires_at: 1, scope: 'openid', refresh: true };
+    responses['POST /oauth2'] = { flow: 'f1', authorization_url: 'https://id.example.test/authorize?state=s' };
+    responses['GET /oauth2/flows/f1'] = { token };
+    const result = await store.oauth('get', request(), 'req_1', 'col_1');
+    expect(result).toEqual({ flow: 'f1', authorization_url: 'https://id.example.test/authorize?state=s' });
+    const sent = calls.find((c) => c.path === '/oauth2');
+    expect(sent?.body).toMatchObject({ action: 'get', env_id: 'env_1', request: { id: 'req_1' } });
+    expect(await store.oauthWait('f1')).toEqual(token);
+    expect(calls.at(-1)).toMatchObject({ method: 'GET', path: '/oauth2/flows/f1' });
+  });
+});

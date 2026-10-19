@@ -16,8 +16,8 @@ use anyhow::{Result, bail};
 use serde_json::Value;
 
 use crate::model::{
-    ApiKeyIn, Auth, Body, Collection, Environment, FieldKind, Folder, Item, KeyValue,
-    MultipartField, RawLang, Request, Scripts, Variable,
+    ApiKeyIn, Auth, Body, ClientAuth, Collection, Environment, FieldKind, Folder, Item, KeyValue,
+    MultipartField, OAuth2Cc, OAuth2Code, RawLang, Request, Scripts, Variable,
 };
 
 use super::{Imported, array, fill_path_params, split_query, stable_id, text};
@@ -375,6 +375,15 @@ struct Builder {
     credentials: usize,
 }
 
+/// `credentialsInBody` de Insomnia.
+fn client_auth(auth: &Value) -> ClientAuth {
+    if auth.get("credentialsInBody").and_then(Value::as_bool) == Some(true) {
+        ClientAuth::Body
+    } else {
+        ClientAuth::Basic
+    }
+}
+
 impl Builder {
     /// Plantillas de Insomnia → `{{nombre}}`; los comentarios `{# … #}` se quitan.
     fn t(&mut self, source: &str) -> String {
@@ -613,6 +622,37 @@ impl Builder {
                     },
                 }
             }
+            "digest" => Auth::Digest {
+                username: field("username"),
+                password: field("password"),
+            },
+            "oauth2" => match text(auth.get("grantType")).as_str() {
+                "client_credentials" => Auth::oauth2_cc(OAuth2Cc {
+                    token_url: field("accessTokenUrl"),
+                    client_id: field("clientId"),
+                    client_secret: field("clientSecret"),
+                    scope: field("scope"),
+                    client_auth: client_auth(auth),
+                }),
+                "" | "authorization_code" => {
+                    let redirect = field("redirectUrl");
+                    Auth::oauth2_code(OAuth2Code {
+                        auth_url: field("authorizationUrl"),
+                        token_url: field("accessTokenUrl"),
+                        client_id: field("clientId"),
+                        client_secret: field("clientSecret"),
+                        scope: field("scope"),
+                        redirect_uri: super::local_redirect(&redirect, at, &mut self.unsupported),
+                        client_auth: client_auth(auth),
+                    })
+                }
+                grant => {
+                    self.unsupported.push(format!(
+                        "{at}: OAuth 2.0 grant {grant:?} not supported (only client credentials and authorization code), imported as none"
+                    ));
+                    Auth::None
+                }
+            },
             other => {
                 self.unsupported.push(format!(
                     "{at}: auth {other:?} not supported yet, imported as none"

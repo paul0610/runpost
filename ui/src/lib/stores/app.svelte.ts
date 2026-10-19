@@ -18,6 +18,8 @@ import type {
   Item,
   KeyValue,
   McpStatus,
+  OAuthResult,
+  OAuthToken,
   Request,
   RunResult,
   RunnerItem,
@@ -1303,6 +1305,24 @@ class AppStore {
       env_id: this.settings?.active_environment ?? null,
     });
     return code;
+  }
+
+  /**
+   * Token OAuth 2.0 de la auth efectiva (propia o heredada) de una petición: `status`, `get`
+   * ("Obtener token nuevo") o `clear`. Con authorization code, `get` abre el navegador y devuelve el
+   * inicio de sesión en curso, que se espera con `oauthWait`.
+   */
+  async oauth(action: 'status' | 'get' | 'clear', request: Request, requestId: string | null, collectionId: string | null): Promise<OAuthResult> {
+    return api.post<OAuthResult>('/oauth2', {
+      request: requestPayload(request, requestId, collectionId),
+      env_id: this.settings?.active_environment ?? null,
+      action,
+    });
+  }
+
+  async oauthWait(flow: string): Promise<OAuthToken> {
+    const { token } = await api.get<{ token: OAuthToken }>(`/oauth2/flows/${encodeURIComponent(flow)}`);
+    return token;
   }
 
   /** "Copiar como curl" de una petición guardada o de la pestaña actual. */

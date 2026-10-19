@@ -120,6 +120,9 @@ con tus rutas. Ejemplos en [docs/mcp-client-configs/](docs/mcp-client-configs/),
 - Importar desde Postman v2.1, OpenAPI 3, HAR, Insomnia (v4 y v5), Bruno (`.bru`, YAML o JSON) y
   cURL ([qué se traduce](docs/IMPORT.md)); exportar a Postman v2.1. Snippets de código (cURL, fetch,
   PowerShell, Python) que dejan los secretos como `{{variables}}`, y cuerpos GraphQL.
+- Auth: bearer, basic, API key, digest y OAuth 2.0 (client credentials, y authorization code con
+  PKCE y callback local). Los tokens quedan en memoria o en el llavero del sistema, nunca en archivos
+  ([detalle](docs/AUTH.md)).
 - Scripts `pm.*` Pre-request y Tests (sandbox QuickJS), Collection Runner con datos CSV/JSON e
   informes JUnit/HTML, también desde la terminal (`runpost_mcp run`).
 - Servidor MCP (stdio, o Streamable HTTP con la app abierta) con 13 tools compactas: peticiones

@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use runpost_core::{
     Executor, NetworkError, RequestDraft, RunContext, Source, Workspace,
     model::{
-        Auth, Body, Collection, Environment, Folder, Item, KeyValue, RawLang, Request, Scripts,
-        Variable,
+        Auth, Body, Collection, Environment, Folder, Item, KeyValue, OAuth2Cc, RawLang, Request,
+        Scripts, Variable,
     },
 };
 use serde_json::json;
@@ -435,4 +435,234 @@ async fn unsaved_drafts_run_their_own_scripts() -> anyhow::Result<()> {
         Some("test script of request: ReferenceError: undefinedThing is not defined")
     );
     Ok(())
+}
+
+/// El historial (SQLite) no contiene ninguno de `needles`.
+fn assert_not_in_history(dir: &std::path::Path, needles: &[&str]) {
+    for file in ["history.db", "history.db-wal"] {
+        if let Ok(bytes) = std::fs::read(dir.join(file)) {
+            for needle in needles {
+                assert!(
+                    !bytes.windows(needle.len()).any(|w| w == needle.as_bytes()),
+                    "{needle} leaked into {file}"
+                );
+            }
+        }
+    }
+}
+
+const DIGEST_PASS: &str = "fake-digest-pass";
+
+/// Servidor digest de verdad: sin `Authorization` contesta 401 con el reto; con él, rehace el
+/// cálculo de RFC 2617 y solo acepta la respuesta correcta.
+fn digest_server(request: &wiremock::Request) -> ResponseTemplate {
+    use md5::{Digest as _, Md5};
+    let h = |text: String| {
+        Md5::digest(text.as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    };
+    let challenge =
+        r#"Digest realm="acme", qop="auth", nonce="nonce-1", opaque="opaque-1", algorithm=MD5"#;
+    let Some(header) = request
+        .headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+    else {
+        return ResponseTemplate::new(401).insert_header("www-authenticate", challenge);
+    };
+    let params: std::collections::HashMap<String, String> = header
+        .trim_start_matches("Digest ")
+        .split(", ")
+        .filter_map(|pair| pair.split_once('='))
+        .map(|(k, v)| (k.to_owned(), v.trim_matches('"').to_owned()))
+        .collect();
+    let ha1 = h(format!("acme:acme:{DIGEST_PASS}"));
+    let ha2 = h(format!("GET:{}", params["uri"]));
+    let expected = h(format!(
+        "{ha1}:nonce-1:{}:{}:auth:{ha2}",
+        params["nc"], params["cnonce"]
+    ));
+    if params["response"] == expected
+        && params["opaque"] == "opaque-1"
+        && params["uri"] == "/v1/digest?x=1"
+    {
+        ResponseTemplate::new(200).set_body_json(json!({"ok": true}))
+    } else {
+        ResponseTemplate::new(403)
+    }
+}
+
+#[tokio::test]
+async fn digest_answers_the_challenge_and_hides_the_response() -> anyhow::Result<()> {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/digest"))
+        .respond_with(digest_server)
+        .expect(2)
+        .mount(&server)
+        .await;
+    let (dir, ws) = workspace();
+    let mut env = Environment::new("digest");
+    env.variables = vec![Variable::secret("digestPass", DIGEST_PASS)];
+    ws.save_environment(&env)?;
+    let mut settings = ws.settings();
+    settings.active_environment = Some(env.id.clone());
+    ws.save_settings(&settings)?;
+    let draft = RequestDraft {
+        method: "GET".into(),
+        url: format!("{}/v1/digest?x=1", server.uri()),
+        auth: Auth::Digest {
+            username: "acme".into(),
+            password: "{{digestPass}}".into(),
+        },
+        ..RequestDraft::default()
+    };
+    let result = Executor::new()
+        .send_adhoc(&ws, draft, RunContext::new(Source::Ui))
+        .await?;
+    server.verify().await;
+    assert_eq!(result.response.status, 200, "{:?}", result.response);
+    let (_, authorization) = result
+        .resolved
+        .headers
+        .iter()
+        .find(|(k, _)| k == "Authorization")
+        .expect("digest header");
+    assert!(
+        authorization.starts_with(r#"Digest username="acme", realm="acme", nonce="nonce-1""#),
+        "{authorization}"
+    );
+    assert!(authorization.contains(r#"response="***""#));
+    let entry = ws.history().get(&result.history_id)?.expect("history row");
+    assert!(
+        entry
+            .req_headers
+            .iter()
+            .any(|(k, v)| k == "Authorization" && v == authorization)
+    );
+    drop(ws);
+    assert_not_in_history(dir.path(), &[DIGEST_PASS]);
+    Ok(())
+}
+
+const OAUTH_TOKEN: &str = "fake-oauth-access-token";
+const CLIENT_SECRET: &str = "fake-client-secret";
+
+#[tokio::test]
+async fn oauth2_client_credentials_token_is_fetched_once_and_masked() -> anyhow::Result<()> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .and(wiremock::matchers::body_string_contains(
+            "grant_type=client_credentials",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token": OAUTH_TOKEN, "token_type": "Bearer", "expires_in": 3600
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/accounts"))
+        .and(header(
+            "authorization",
+            format!("Bearer {OAUTH_TOKEN}").as_str(),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"echo": OAUTH_TOKEN})))
+        .expect(2)
+        .mount(&server)
+        .await;
+    let (dir, ws) = workspace();
+    let mut env = Environment::new("idp");
+    env.variables = vec![
+        Variable::new("base", server.uri()),
+        Variable::secret("clientSecret", CLIENT_SECRET),
+    ];
+    ws.save_environment(&env)?;
+    let mut settings = ws.settings();
+    settings.active_environment = Some(env.id.clone());
+    ws.save_settings(&settings)?;
+    let mut collection = Collection::new("OAuth API");
+    collection.auth = Some(Auth::oauth2_cc(OAuth2Cc {
+        token_url: "{{base}}/oauth/token".into(),
+        client_id: "acme-client".into(),
+        client_secret: "{{clientSecret}}".into(),
+        scope: "accounts_read".into(),
+        client_auth: Default::default(),
+    }));
+    let request = Request::new("accounts", "GET", "{{base}}/v1/accounts");
+    collection
+        .items
+        .push(Item::Request(Box::new(request.clone())));
+    ws.save_collection(&collection)?;
+
+    let executor = Executor::new();
+    for _ in 0..2 {
+        let result = executor
+            .run(&ws, &request, RunContext::new(Source::Mcp))
+            .await?;
+        assert_eq!(result.response.status, 200);
+        assert!(
+            result
+                .resolved
+                .headers
+                .contains(&("Authorization".into(), "Bearer ***".into()))
+        );
+        assert_eq!(
+            result
+                .masker
+                .mask(&String::from_utf8_lossy(&result.response.body)),
+            r#"{"echo":"***"}"#
+        );
+        assert!(!serde_json::to_string(&result.resolved)?.contains(OAUTH_TOKEN));
+    }
+    // El token se pidió una sola vez (el mock lo comprueba) y está en memoria, no en disco.
+    server.verify().await;
+
+    // Sin variable para el secreto: error claro, sin enviar nada.
+    let mut broken = collection.clone();
+    broken.auth = Some(Auth::oauth2_cc(OAuth2Cc {
+        token_url: "{{base}}/oauth/token".into(),
+        client_id: "acme-client".into(),
+        client_secret: "{{missing}}".into(),
+        scope: String::new(),
+        client_auth: Default::default(),
+    }));
+    ws.save_collection(&broken)?;
+    let error = executor
+        .run(&ws, &request, RunContext::new(Source::Mcp))
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "OAuth 2.0: the settings use variables without a value: missing"
+    );
+    drop(ws);
+    assert_not_in_history(dir.path(), &[OAUTH_TOKEN, CLIENT_SECRET]);
+    for entry in walk(dir.path()) {
+        let text = std::fs::read(&entry).unwrap_or_default();
+        assert!(
+            !text
+                .windows(OAUTH_TOKEN.len())
+                .any(|w| w == OAUTH_TOKEN.as_bytes()),
+            "token written to {}",
+            entry.display()
+        );
+    }
+    Ok(())
+}
+
+fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            out.extend(walk(&path));
+        } else {
+            out.push(path);
+        }
+    }
+    out
 }

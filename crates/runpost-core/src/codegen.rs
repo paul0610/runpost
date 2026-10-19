@@ -3,6 +3,7 @@
 //! Las variables normales se sustituyen; los secretos, las dinámicas y las desconocidas quedan como
 //! `{{nombre}}`: el snippet puede acabar en un chat o un ticket y nunca lleva un secreto. Basic se
 //! codifica al ejecutar el snippet (no dentro de él) y los archivos se citan por ruta, sin leerlos.
+//! Digest usa lo que trae cada herramienta (fetch no tiene) y OAuth 2.0 deja `{{access_token}}`.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -52,6 +53,10 @@ struct Snip {
     headers: Vec<(String, String)>,
     /// Basic: cada lenguaje lo codifica a su manera al ejecutarse.
     basic: Option<(String, String)>,
+    /// Digest: lo resuelve la herramienta (curl `--digest`, Python `HTTPDigestAuth`…).
+    digest: Option<(String, String)>,
+    /// Comentario para la primera línea.
+    note: Option<&'static str>,
     body: SnipBody,
 }
 
@@ -77,14 +82,25 @@ struct Part {
     file: bool,
 }
 
+const OAUTH_NOTE: &str = "OAuth 2.0: {{access_token}} is the token RunPost gets for this request";
+const DIGEST_FETCH_NOTE: &str =
+    "Digest auth: fetch cannot answer the challenge; use curl, PowerShell or Python";
+
 /// `auth` debe ser la efectiva (`engine::auth::effective_auth`).
 pub fn render(lang: Lang, request: &Request, auth: &Auth, resolver: &Resolver) -> String {
-    let snip = prepare(request, auth, resolver);
-    match lang {
-        Lang::Curl => curl(&snip),
-        Lang::Fetch => fetch(&snip),
-        Lang::Powershell => powershell(&snip),
-        Lang::Python => python(&snip),
+    let mut snip = prepare(request, auth, resolver);
+    if lang == Lang::Fetch && snip.digest.is_some() {
+        snip.note = Some(DIGEST_FETCH_NOTE);
+    }
+    let (comment, code) = match lang {
+        Lang::Curl => ("#", curl(&snip)),
+        Lang::Fetch => ("//", fetch(&snip)),
+        Lang::Powershell => ("#", powershell(&snip)),
+        Lang::Python => ("#", python(&snip)),
+    };
+    match snip.note {
+        Some(note) => format!("{comment} {note}\n{code}"),
+        None => code,
     }
 }
 
@@ -121,8 +137,22 @@ fn prepare(request: &Request, auth: &Auth, resolver: &Resolver) -> Snip {
         .map(|h| (r(h.key.trim()), r(&h.value)))
         .collect();
     let mut basic = None;
+    let mut digest = None;
+    let mut note = None;
     match auth {
         Auth::None | Auth::Inherit => {}
+        Auth::Digest { username, password } => {
+            headers.retain(|(k, _)| !k.eq_ignore_ascii_case("authorization"));
+            digest = Some((r(username), r(password)));
+        }
+        Auth::OAuth2Cc(_) | Auth::OAuth2Code(_) => {
+            set_header(
+                &mut headers,
+                "Authorization",
+                "Bearer {{access_token}}".into(),
+            );
+            note = Some(OAUTH_NOTE);
+        }
         Auth::Bearer { token } => {
             if !token.is_empty() {
                 set_header(
@@ -226,6 +256,8 @@ fn prepare(request: &Request, auth: &Auth, resolver: &Resolver) -> Snip {
         url,
         headers,
         basic,
+        digest,
+        note,
         body,
     }
 }
@@ -251,6 +283,9 @@ fn curl(s: &Snip) -> String {
     );
     if let Some((user, pass)) = &s.basic {
         lines.push(format!("--user {}", sh(&format!("{user}:{pass}"))));
+    }
+    if let Some((user, pass)) = &s.digest {
+        lines.push(format!("--digest --user {}", sh(&format!("{user}:{pass}"))));
     }
     match &s.body {
         SnipBody::None => {}
@@ -420,6 +455,15 @@ fn powershell(s: &Snip) -> String {
     if has_headers {
         call.push_str(" -Headers $headers");
     }
+    if let Some((user, pass)) = &s.digest {
+        // .NET contesta el reto digest con estas credenciales.
+        out.push_str(&format!(
+            "$credential = New-Object System.Management.Automation.PSCredential({}, (ConvertTo-SecureString {} -AsPlainText -Force))\n\n",
+            ps(user),
+            ps(pass)
+        ));
+        call.push_str(" -Credential $credential");
+    }
     match &s.body {
         SnipBody::None => {}
         SnipBody::Text {
@@ -497,6 +541,9 @@ fn python(s: &Snip) -> String {
     if json_import {
         out.push_str("import json\n");
     }
+    if s.digest.is_some() {
+        out.push_str("from requests.auth import HTTPDigestAuth\n");
+    }
     out.push_str(&format!("\nurl = {}\n\n", quoted(&s.url)));
     let mut args = Vec::new();
     match &s.body {
@@ -566,6 +613,14 @@ fn python(s: &Snip) -> String {
     }
     if let Some((user, pass)) = &s.basic {
         out.push_str(&format!("auth = ({}, {})\n", quoted(user), quoted(pass)));
+        args.push("auth=auth");
+    }
+    if let Some((user, pass)) = &s.digest {
+        out.push_str(&format!(
+            "auth = HTTPDigestAuth({}, {})\n",
+            quoted(user),
+            quoted(pass)
+        ));
         args.push("auth=auth");
     }
     let mut call = format!("requests.request({}, url", quoted(&s.method));

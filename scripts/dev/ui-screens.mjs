@@ -457,6 +457,14 @@ async function s8() {
   const summaries = await api('/collections');
   const collectionId = summaries.find((c) => c.name.startsWith('Acme')).id;
   const collection = await api(`/collections/${collectionId}`);
+  const add = async (name, extra) => {
+    if (!collection.items.some((i) => i.name === name)) {
+      await api(`/collections/${collectionId}/items`, { parent_id: null, item: { type: 'request', id: '', name, method: 'GET', ...extra } }, 'POST');
+    }
+  };
+  // OAuth 2.0: client credentials contra el token falso del mock y authorization code (solo campos).
+  await add('OAuth 2.0 - sesión', { url: '{{apiUrl}}/v1/session', auth: { type: 'oauth2_cc', token_url: '{{apiUrl}}/oauth/token', client_id: 'acme-client', client_secret: '{{encryptPassword}}', scope: 'accounts_read' } });
+  await add('OAuth 2.0 - login', { url: '{{apiUrl}}/v1/session', auth: { type: 'oauth2_code', auth_url: 'https://id.acme.test/authorize', token_url: 'https://id.acme.test/oauth/token', client_id: 'acme-app', client_secret: '', scope: 'openid accounts_read', redirect_uri: 'http://127.0.0.1:7880/callback' } });
   if (!collection.items.some((i) => i.name === 'GraphQL - cuenta')) {
     const query = 'query Account($id: ID!) {\n  account(id: $id) {\n    id\n    currency\n    balance\n  }\n}';
     await api(`/collections/${collectionId}/items`, { parent_id: null, item: { type: 'request', id: '', name: 'GraphQL - cuenta', method: 'POST', url: '{{apiUrl}}/graphql', body: { mode: 'graphql', query, variables: '{\n  "id": "{{accountId}}"\n}' } } }, 'POST');
@@ -483,6 +491,17 @@ async function s8() {
     await shot(`app-import-${theme}.png`);
     await evaluate(`document.querySelector('.dialog button.primary').click(); await wait(900);`);
     await shot(`app-import-curl-${theme}.png`);
+    // Auth OAuth 2.0: client credentials con su token listo (el mock lo da) y authorization code.
+    await evaluate(`row('OAuth 2.0 - sesión').click(); await wait(500);
+      [...document.querySelectorAll('.subtabs [role=tab]')].find(b => b.textContent.startsWith('Auth')).click(); await wait(500);
+      [...document.querySelectorAll('.token button')].find(b => b.classList.contains('primary')).click();
+      // Los avisos se van a los 4,5 s; el panel del token queda a la vista.
+      await wait(5000); document.querySelector('.token').scrollIntoView({ block: 'end' }); await wait(300);`);
+    await shot(`app-oauth-cc-${theme}.png`);
+    await evaluate(`row('OAuth 2.0 - login').click(); await wait(500);
+      [...document.querySelectorAll('.subtabs [role=tab]')].find(b => b.textContent.startsWith('Auth')).click(); await wait(800);
+      document.querySelector('.auth .fields').scrollIntoView({ block: 'start' }); await wait(200);`);
+    await shot(`app-oauth-code-${theme}.png`);
   }
 }
 

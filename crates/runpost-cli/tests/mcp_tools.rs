@@ -449,3 +449,33 @@ fn get_request_snippet_keeps_the_secret_as_a_variable() {
     let transcript = mcp.finish();
     assert!(!transcript.contains(FAKE_TOKEN));
 }
+
+#[test]
+fn get_request_hides_literal_credentials_in_auth() {
+    let dir = acme_workspace();
+    let mut mcp = McpClient::start(dir.path());
+    mcp.call_json(
+        "upsert_request",
+        json!({"collection": "Scratch", "requests": [
+            {"name": "digest", "method": "GET", "url": "http://127.0.0.1:9/a",
+             "auth": {"type": "digest", "username": "acme", "password": "fake-literal-pass"}},
+            {"name": "oauth", "method": "GET", "url": "http://127.0.0.1:9/b",
+             "auth": {"type": "oauth2_cc", "token_url": "http://127.0.0.1:9/token",
+                      "client_id": "acme", "client_secret": "{{clientSecret}}", "scope": ""}}
+        ]}),
+    );
+    let digest = mcp.call_json(
+        "get_request",
+        json!({"request": "Scratch/digest", "fields": ["auth"]}),
+    );
+    assert_eq!(digest["auth"]["username"], "acme");
+    assert_eq!(digest["auth"]["password"], "***");
+    let oauth = mcp.call_json(
+        "get_request",
+        json!({"request": "Scratch/oauth", "fields": ["auth"]}),
+    );
+    assert_eq!(oauth["auth"]["type"], "oauth2_cc");
+    assert_eq!(oauth["auth"]["client_secret"], "{{clientSecret}}");
+    let transcript = mcp.finish();
+    assert!(!transcript.contains("fake-literal-pass"));
+}

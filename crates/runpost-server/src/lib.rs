@@ -163,11 +163,14 @@ pub async fn start_with_options(
         ]);
     let events = broadcast::channel(1024).0;
     let agent = Arc::new(AgentHub::new(events.clone()));
+    let executor = Arc::new(Executor::new());
     let (mcp_listener, mcp_status) = match options.mcp_port {
         Some(mcp_port) => {
             mcp::start(
                 mcp_port,
-                Tools::new(workspace.clone()).with_hub(agent.clone()),
+                Tools::new(workspace.clone())
+                    .with_executor(executor.clone())
+                    .with_hub(agent.clone()),
                 agent.clone(),
                 token.clone(),
                 &workspace,
@@ -183,7 +186,7 @@ pub async fn start_with_options(
         origins: Arc::new(origins),
         browser: options.browser,
         workspace,
-        executor: Arc::new(Executor::new()),
+        executor,
         recent: Arc::new(Mutex::new(VecDeque::new())),
         events,
         runs: Arc::new(runner::Runs::default()),

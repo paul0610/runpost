@@ -25,7 +25,35 @@ export type Auth =
   | { type: 'inherit' }
   | { type: 'bearer'; token: string }
   | { type: 'basic'; username: string; password: string }
-  | { type: 'apikey'; key: string; value: string; in: 'header' | 'query' };
+  | { type: 'apikey'; key: string; value: string; in: 'header' | 'query' }
+  | { type: 'digest'; username: string; password: string }
+  | { type: 'oauth2_cc'; token_url: string; client_id: string; client_secret: string; scope: string; client_auth?: ClientAuth }
+  | {
+      type: 'oauth2_code';
+      auth_url: string;
+      token_url: string;
+      client_id: string;
+      client_secret: string;
+      scope: string;
+      redirect_uri: string;
+      client_auth?: ClientAuth;
+    };
+
+/** Cómo se presenta el cliente OAuth 2.0 al pedir el token. */
+export type ClientAuth = 'basic' | 'body';
+
+/** Lo que se ve de un token OAuth 2.0 (nunca el token). */
+export interface OAuthToken {
+  token_type: string;
+  /** Milisegundos Unix; `null` = sin caducidad conocida. */
+  expires_at: number | null;
+  scope: string;
+  /** Hay refresh token: se renueva solo. */
+  refresh: boolean;
+}
+
+/** `POST /oauth2`: el token (client credentials, estado, borrar) o un inicio de sesión en curso. */
+export type OAuthResult = { token: OAuthToken | null } | { flow: string; authorization_url: string };
 
 export type RawLang = 'json' | 'text' | 'xml' | 'html' | 'javascript';
 

@@ -117,8 +117,14 @@ de otras plataformas. No se borraron dependencias para ocultar hallazgos.
 | Cargo (dependencia directa nueva) | Versión | Publicación (UTC) |
 |---|---|---|
 | yaml-rust2 (`default-features = false`) | 0.13.0 | 2026-09-11 |
+| md-5 (`default-features = false`) | 0.11.0 | 2026-03-27 |
 
-Lee los documentos YAML que se importan (OpenAPI 3, Insomnia v5 y las colecciones OpenCollection de
-Bruno). Solo añade la transitiva `arraydeque` 0.5.1 (2023-02-05). Consulta del 2026-10-18 en
-crates.io y OSV: ambas versiones superan los siete días y no tienen avisos. Los ids estables de las
-importaciones (SHA-256) usan `aws-lc-rs`, que ya estaba.
+- `yaml-rust2` lee los documentos YAML que se importan (OpenAPI 3, Insomnia v5 y las colecciones
+  OpenCollection de Bruno). Solo añade la transitiva `arraydeque` 0.5.1 (2023-02-05).
+- `md-5`, de RustCrypto, calcula los hashes MD5 de la autenticación digest (RFC 7616): `aws-lc-rs`
+  no tiene MD5 en su API segura. Solo depende de `digest` 0.11 y `cfg-if`, que ya estaban. La suma de
+  `Cargo.lock` coincide con la que publica crates.io.
+
+Consulta del 2026-10-18 en crates.io y OSV: todas las versiones superan los siete días y no tienen
+avisos. SHA-256 y SHA-512-256 (digest, PKCE de OAuth 2.0 y los ids estables de las importaciones)
+usan `aws-lc-rs`, que ya estaba.

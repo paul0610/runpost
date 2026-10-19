@@ -15,6 +15,7 @@ bytes.workspace = true
 chrono.workspace = true
 getrandom.workspace = true
 keyring.workspace = true
+md-5.workspace = true
 notify.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true

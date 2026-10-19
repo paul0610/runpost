@@ -700,6 +700,7 @@ fn send_native(host: &ScriptHost, deadline: Instant, options: &str) -> String {
                 max_redirects: 10,
                 proxy: None,
             },
+            digest: None,
         };
         let response = host
             .runtime

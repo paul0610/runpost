@@ -14,7 +14,8 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use runpost_core::{
     CLI_BIN, CoreError, Executor, ImportReport, NetworkError, RequestDraft, RunContext, Source,
     codegen::Lang,
-    executor::snippet,
+    engine::oauth::{self, Started},
+    executor::{auth_context, mask_error, snippet},
     export::postman_v21::{export_collection, export_environment},
     import::Format,
     import::postman_v21::PostmanKind,
@@ -74,6 +75,7 @@ impl From<anyhow::Error> for ApiError {
                 CoreError::UnsupportedSchema { .. } => StatusCode::UNPROCESSABLE_ENTITY,
                 CoreError::InvalidRequest(_) => StatusCode::BAD_REQUEST,
                 CoreError::Keyring(_) => StatusCode::SERVICE_UNAVAILABLE,
+                CoreError::OAuth(_) => StatusCode::BAD_REQUEST,
             };
             return Self::new(status, &core.code(), core.to_string());
         }
@@ -168,6 +170,8 @@ pub(crate) fn routes() -> Router<AppState> {
         .route("/globals", get(get_globals).put(put_globals))
         .route("/send", post(send))
         .route("/codegen/{lang}", post(codegen))
+        .route("/oauth2", post(oauth2))
+        .route("/oauth2/flows/{id}", get(oauth2_flow))
         .route("/history", get(list_history).delete(clear_history))
         .route("/history/{id}", get(get_history))
         .route(
@@ -519,6 +523,90 @@ async fn codegen(
         }
     };
     ok(json!({"lang": lang.as_str(), "code": code}))
+}
+
+// ---- OAuth 2.0 ----
+
+#[derive(Deserialize, Default, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum OAuthAction {
+    #[default]
+    Status,
+    Get,
+    Clear,
+}
+
+#[derive(Deserialize)]
+struct OAuthBody {
+    request: SendTarget,
+    env_id: Option<String>,
+    /// `status` (por defecto), `get` ("Get new access token") o `clear`.
+    #[serde(default)]
+    action: OAuthAction,
+    /// `get` de authorization code: abrir la URL de autorización en el navegador (por defecto, sí).
+    open: Option<bool>,
+}
+
+/// Token OAuth 2.0 de la auth efectiva de una petición: estado, pedir uno nuevo u olvidarlo. Nunca
+/// devuelve el token, solo su tipo, caducidad, scope y si se renueva solo.
+async fn oauth2(State(state): State<AppState>, Body(body): Body<OAuthBody>) -> ApiResult {
+    let ws = &state.workspace;
+    let env = body.env_id.filter(|e| !e.is_empty());
+    let (request, collection) = match body.request {
+        SendTarget::ById { request_id } => {
+            let (_, request) = ws.find_request(&runpost_core::RequestSelector::Id(request_id))?;
+            (request, None)
+        }
+        SendTarget::Saved(request) => (*request, None),
+        SendTarget::Draft(draft) => {
+            let collection = draft.collection_id.clone();
+            (draft.into_request(), collection)
+        }
+    };
+    let (auth, resolver) = auth_context(ws, &request, collection.as_deref(), env.as_deref())?;
+    let Some((config, missing)) = oauth::Config::resolve(&auth, &resolver) else {
+        return Err(ApiError::bad_request(
+            "the request does not use OAuth 2.0 (check its Auth tab and its folders)",
+        ));
+    };
+    if !missing.is_empty() {
+        return Err(CoreError::OAuth(format!(
+            "the settings use variables without a value: {}",
+            missing.join(", ")
+        ))
+        .into());
+    }
+    let tokens = state.executor.oauth();
+    let keyring = ws.keyring();
+    match body.action {
+        OAuthAction::Status => ok(json!({"token": tokens.info(&config, keyring.as_ref())})),
+        OAuthAction::Clear => {
+            tokens.clear(&config, keyring.as_ref());
+            ok(json!({"token": null}))
+        }
+        OAuthAction::Get => {
+            let client = state.executor.plain_client(&ws.settings().http)?;
+            let started = tokens
+                .start(config, client, keyring)
+                .await
+                .map_err(|error| mask_error(error, resolver.masker()))?;
+            if let Started::SignIn {
+                authorization_url, ..
+            } = &started
+                && body.open.unwrap_or(true)
+                && let Err(error) = open::that_detached(authorization_url)
+            {
+                tracing::warn!("cannot open the browser for the OAuth 2.0 sign-in: {error}");
+            }
+            ok(serde_json::to_value(&started).unwrap_or_default())
+        }
+    }
+}
+
+/// Espera a que termine un inicio de sesión (authorization code) de `POST /oauth2`.
+async fn oauth2_flow(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
+    let token = state.executor.oauth().wait(&id).await?;
+    ok(json!({"token": token}))
 }
 
 // ---- historial ----

@@ -39,6 +39,9 @@
     if (auth.type === 'bearer') return [{ key: 'Authorization', value: `Bearer ${auth.token}`, note }];
     if (auth.type === 'basic') return [{ key: 'Authorization', value: 'Basic …', note }];
     if (auth.type === 'apikey' && auth.in === 'header' && auth.key) return [{ key: auth.key, value: auth.value, note }];
+    // Digest firma el reintento tras el reto del servidor; OAuth 2.0 lleva el token del panel Auth.
+    if (auth.type === 'digest') return [{ key: 'Authorization', value: 'Digest …', note }];
+    if (auth.type === 'oauth2_cc' || auth.type === 'oauth2_code') return [{ key: 'Authorization', value: 'Bearer …', note }];
     return [];
   });
 

@@ -169,6 +169,33 @@ pub(crate) fn split_query(url: &str) -> (String, Vec<crate::model::KeyValue>) {
     (format!("{path}{fragment}"), params)
 }
 
+/// Callback de authorization code que sirve en RunPost: el del origen si es local
+/// (`http://127.0.0.1:<puerto>/…`) o lleva variables; si no (p. ej. el de Postman en la nube), el de
+/// RunPost, con un aviso para registrarlo en el proveedor.
+pub(crate) fn local_redirect(uri: &str, at: &str, warnings: &mut Vec<String>) -> String {
+    use crate::model::OAUTH_REDIRECT_URI;
+    let uri = uri.trim();
+    let local = url::Url::parse(uri).ok().is_some_and(|url| {
+        url.scheme() == "http"
+            && url.port().is_some()
+            && match url.host() {
+                Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+                Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+                Some(url::Host::Domain(domain)) => domain.eq_ignore_ascii_case("localhost"),
+                None => false,
+            }
+    });
+    if local || uri.contains("{{") {
+        return uri.to_owned();
+    }
+    if !uri.is_empty() {
+        warnings.push(format!(
+            "{at}: the OAuth 2.0 callback {uri} is not on this computer; RunPost uses {OAUTH_REDIRECT_URI}: register it with the provider"
+        ));
+    }
+    OAUTH_REDIRECT_URI.to_owned()
+}
+
 /// Id estable (`col_` + 32 hex) para formatos sin UUID propio: reimportar lo mismo sustituye la
 /// colección en vez de duplicarla.
 pub(crate) fn stable_id(prefix: &str, seed: &str) -> String {

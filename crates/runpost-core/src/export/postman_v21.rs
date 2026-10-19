@@ -6,8 +6,8 @@
 use serde_json::{Map, Value, json};
 
 use crate::model::{
-    ApiKeyIn, Auth, Body, Collection, Environment, FieldKind, Item, KeyValue, RawLang, Request,
-    Scripts, Variable,
+    ApiKeyIn, Auth, Body, ClientAuth, Collection, Environment, FieldKind, Item, KeyValue, RawLang,
+    Request, Scripts, Variable,
 };
 
 pub const SCHEMA_URL: &str = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json";
@@ -46,7 +46,33 @@ fn auth(auth: &Auth) -> Option<Value> {
             ("key", key), ("value", value),
             ("in", if *location == ApiKeyIn::Query { "query" } else { "header" }),
         ])}),
+        Auth::Digest { username, password } => json!({"type": "digest",
+            "digest": attrs(&[("username", username), ("password", password)])}),
+        // Postman: "Send as Basic Auth header" (`header`) o "Send client credentials in body".
+        Auth::OAuth2Cc(cc) => json!({"type": "oauth2", "oauth2": attrs(&[
+            ("grant_type", "client_credentials"),
+            ("accessTokenUrl", &cc.token_url), ("clientId", &cc.client_id),
+            ("clientSecret", &cc.client_secret), ("scope", &cc.scope),
+            ("client_authentication", client_authentication(cc.client_auth)),
+            ("addTokenTo", "header"),
+        ])}),
+        Auth::OAuth2Code(code) => json!({"type": "oauth2", "oauth2": attrs(&[
+            ("grant_type", "authorization_code_with_pkce"),
+            ("authUrl", &code.auth_url), ("accessTokenUrl", &code.token_url),
+            ("clientId", &code.client_id), ("clientSecret", &code.client_secret),
+            ("scope", &code.scope), ("redirect_uri", &code.redirect_uri),
+            ("challengeAlgorithm", "S256"),
+            ("client_authentication", client_authentication(code.client_auth)),
+            ("addTokenTo", "header"),
+        ])}),
     })
+}
+
+fn client_authentication(client_auth: ClientAuth) -> &'static str {
+    match client_auth {
+        ClientAuth::Basic => "header",
+        ClientAuth::Body => "body",
+    }
 }
 
 fn key_values(list: &[KeyValue]) -> Value {
@@ -297,7 +323,7 @@ pub fn export_environment(env: &Environment, strip_secrets: bool) -> Value {
 mod tests {
     use super::*;
     use crate::import::postman_v21::{import_collection_value, import_environment_value};
-    use crate::model::{Folder, MultipartField, Variable};
+    use crate::model::{Folder, MultipartField, OAuth2Cc, OAuth2Code, Variable};
 
     fn rich() -> Collection {
         let mut c = Collection::new("Rich");
@@ -441,5 +467,94 @@ mod tests {
             postman_id("col_000000000000400080000000000000c1"),
             "00000000-0000-4000-8000-0000000000c1"
         );
+    }
+
+    #[test]
+    fn digest_and_oauth2_round_trip_through_postman() {
+        let mut c = Collection::new("Auth");
+        let auths = [
+            Auth::Digest {
+                username: "acme".into(),
+                password: "{{digestPass}}".into(),
+            },
+            Auth::oauth2_cc(OAuth2Cc {
+                token_url: "https://id.example.test/oauth/token".into(),
+                client_id: "acme-client".into(),
+                client_secret: "{{clientSecret}}".into(),
+                scope: "accounts_read".into(),
+                client_auth: ClientAuth::Body,
+            }),
+            Auth::oauth2_code(OAuth2Code {
+                auth_url: "https://id.example.test/authorize".into(),
+                token_url: "https://id.example.test/oauth/token".into(),
+                client_id: "acme-app".into(),
+                client_secret: String::new(),
+                scope: "openid".into(),
+                redirect_uri: "http://127.0.0.1:9123/cb".into(),
+                client_auth: ClientAuth::Basic,
+            }),
+        ];
+        for (i, auth) in auths.iter().enumerate() {
+            let mut request = Request::new(format!("r{i}"), "GET", "https://api.example.test");
+            request.auth = auth.clone();
+            c.items.push(Item::Request(Box::new(request)));
+        }
+        let exported = export_collection(&c, false);
+        let oauth = &exported["item"][1]["request"]["auth"];
+        assert_eq!(oauth["type"], "oauth2");
+        let attr = |auth: &Value, key: &str| {
+            auth["oauth2"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|a| a["key"] == key)
+                .map(|a| a["value"].clone())
+        };
+        assert_eq!(attr(oauth, "grant_type").unwrap(), "client_credentials");
+        assert_eq!(attr(oauth, "client_authentication").unwrap(), "body");
+        let code = &exported["item"][2]["request"]["auth"];
+        assert_eq!(
+            attr(code, "grant_type").unwrap(),
+            "authorization_code_with_pkce"
+        );
+        assert_eq!(exported["item"][0]["request"]["auth"]["type"], "digest");
+
+        let back = import_collection_value(&exported).unwrap();
+        assert!(back.warnings.is_empty(), "{:?}", back.warnings);
+        let imported: Vec<Auth> = back
+            .collection
+            .items
+            .iter()
+            .map(|item| match item {
+                Item::Request(request) => request.auth.clone(),
+                Item::Folder(_) => panic!("request"),
+            })
+            .collect();
+        assert_eq!(imported, auths);
+
+        // El callback de Postman en la nube no sirve aquí: se cambia por el local y se avisa.
+        let postman = json!({"info": {"name": "P", "schema": SCHEMA_URL}, "item": [
+            {"name": "login", "request": {"method": "GET", "url": "https://api.example.test",
+             "auth": {"type": "oauth2", "oauth2": [
+                {"key": "redirect_uri", "value": "https://oauth.pstmn.io/v1/callback"},
+                {"key": "authUrl", "value": "https://id.example.test/authorize"},
+                {"key": "useBrowser", "value": true}]}}},
+            {"name": "implicit", "request": {"method": "GET", "url": "https://api.example.test",
+             "auth": {"type": "oauth2", "oauth2": [{"key": "grant_type", "value": "implicit"}]}}}]});
+        let back = import_collection_value(&postman).unwrap();
+        let Item::Request(login) = &back.collection.items[0] else {
+            panic!("request")
+        };
+        let Auth::OAuth2Code(code) = &login.auth else {
+            panic!("oauth2_code")
+        };
+        assert_eq!(code.redirect_uri, crate::model::OAUTH_REDIRECT_URI);
+        assert_eq!(code.auth_url, "https://id.example.test/authorize");
+        assert!(
+            back.warnings[0].contains("register it with the provider"),
+            "{:?}",
+            back.warnings
+        );
+        assert!(back.warnings[1].contains("grant \"implicit\" not supported"));
     }
 }

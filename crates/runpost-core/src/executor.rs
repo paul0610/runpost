@@ -1,6 +1,6 @@
 //! Ejecución de peticiones guardadas o ad hoc, con scripts e historial (secciones 6 y 10).
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context as _, Result};
 use serde::{Deserialize, Serialize};
@@ -8,8 +8,8 @@ use serde_json::json;
 
 use crate::{
     codegen,
-    engine::{self, ClientKey, Clients, ResolvedRequest, Response},
-    error::NetworkError,
+    engine::{self, ClientKey, Clients, ResolvedRequest, Response, oauth::OAuth},
+    error::{CoreError, NetworkError},
     model::{
         Auth, Body, Collection, FieldKind, Folder, HttpSettings, KeyValue, Request,
         RequestSettings, Scripts, new_id,
@@ -142,6 +142,18 @@ pub fn snippet(
     env_id: Option<&str>,
     lang: codegen::Lang,
 ) -> Result<String> {
+    let (auth, resolver) = auth_context(ws, request, collection_id, env_id)?;
+    Ok(codegen::render(lang, request, &auth, &resolver))
+}
+
+/// Auth efectiva (heredada de carpetas y colección) y variables (entorno `env_id` o el activo,
+/// colección y globales) de una petición guardada o de un borrador de `collection_id`.
+pub fn auth_context(
+    ws: &Workspace,
+    request: &Request,
+    collection_id: Option<&str>,
+    env_id: Option<&str>,
+) -> Result<(Auth, Resolver)> {
     let mut owner: Option<Collection> = None;
     if !request.id.is_empty() {
         for summary in ws.collections()? {
@@ -174,7 +186,7 @@ pub fn snippet(
             owner.as_ref().map_or(&[][..], |c| &c.variables),
         )
         .with_variables(Scope::Globals, &globals.variables);
-    Ok(codegen::render(lang, request, &auth, &resolver))
+    Ok((auth, resolver))
 }
 
 /// Un eslabón de la cadena de scripts: colección → carpetas → petición.
@@ -329,14 +341,38 @@ fn mask_tests(tests: Vec<TestResult>, masker: &Masker) -> Vec<TestResult> {
         .collect()
 }
 
+/// Un error OAuth 2.0 puede citar lo que dijo el servidor: pasa por el enmascarado.
+pub fn mask_error(error: anyhow::Error, masker: &Masker) -> anyhow::Error {
+    match error.downcast_ref::<CoreError>() {
+        Some(CoreError::OAuth(message)) => CoreError::OAuth(masker.mask(message)).into(),
+        _ => error,
+    }
+}
+
 #[derive(Default)]
 pub struct Executor {
     clients: Clients,
+    oauth: Arc<OAuth>,
 }
 
 impl Executor {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Tokens OAuth 2.0 de este proceso (y los inicios de sesión en curso).
+    pub fn oauth(&self) -> &Arc<OAuth> {
+        &self.oauth
+    }
+
+    /// Cliente con los ajustes HTTP generales: `pm.sendRequest` y el endpoint de tokens OAuth.
+    pub fn plain_client(&self, http: &HttpSettings) -> Result<reqwest::Client> {
+        self.clients.get(&ClientKey {
+            verify_tls: http.verify_tls,
+            follow_redirects: http.follow_redirects,
+            max_redirects: http.max_redirects,
+            proxy: http.proxy.clone().filter(|p| !p.trim().is_empty()),
+        })
     }
 
     /// Ejecuta `req`. Si su id pertenece a una colección del workspace, usa sus variables, la auth
@@ -399,12 +435,7 @@ impl Executor {
 
     /// Cliente y ajustes para `pm.sendRequest`.
     fn script_host(&self, http: &HttpSettings) -> Result<ScriptHost> {
-        let client = self.clients.get(&ClientKey {
-            verify_tls: http.verify_tls,
-            follow_redirects: http.follow_redirects,
-            max_redirects: http.max_redirects,
-            proxy: http.proxy.clone().filter(|p| !p.trim().is_empty()),
-        })?;
+        let client = self.plain_client(http)?;
         Ok(ScriptHost {
             runtime: tokio::runtime::Handle::current(),
             client,
@@ -522,8 +553,45 @@ impl Executor {
         // 2. La petición, con las variables tal como las dejaron los scripts.
         let resolver = resolver_for(&state);
         masker.merge(resolver.masker());
-        let (prepared, resolved, built_masker) =
-            match engine::build_request(&request, auth, &resolver, &settings.http) {
+        // OAuth 2.0: el token vigente (pedido o renovado si hace falta) va como bearer y se
+        // enmascara como cualquier secreto.
+        let (auth, resolver) = match engine::oauth::Config::resolve(auth, &resolver) {
+            Some((config, missing)) => {
+                let token = if missing.is_empty() {
+                    match self.plain_client(&settings.http) {
+                        Ok(client) => {
+                            self.oauth
+                                .access_token(&config, &client, ws.keyring().as_ref())
+                                .await
+                        }
+                        Err(error) => Err(error),
+                    }
+                } else {
+                    Err(CoreError::OAuth(format!(
+                        "the settings use variables without a value: {}",
+                        missing.join(", ")
+                    ))
+                    .into())
+                };
+                let token = match token {
+                    Ok(token) => token,
+                    Err(error) => {
+                        persist(ws, &state, collection_id);
+                        return Err(mask_error(error, &masker));
+                    }
+                };
+                masker.add(&token.access_token);
+                (
+                    Auth::Bearer {
+                        token: token.access_token.clone(),
+                    },
+                    resolver.with_secret(&token.access_token),
+                )
+            }
+            None => (auth.clone(), resolver),
+        };
+        let (prepared, mut resolved, built_masker) =
+            match engine::build_request(&request, &auth, &resolver, &settings.http) {
                 Ok(built) => built,
                 Err(error) => {
                     persist(ws, &state, collection_id);
@@ -534,6 +602,18 @@ impl Executor {
         let client = self.clients.get(&prepared.client)?;
         let started = chrono::Utc::now().timestamp_millis();
         let outcome = engine::send(&client, &prepared).await;
+        // Digest: la cabecera del segundo intento, sin el `response`.
+        if let Ok(response) = &outcome
+            && let Some(header) = &response.digest_authorization
+        {
+            resolved
+                .headers
+                .retain(|(name, _)| !name.eq_ignore_ascii_case("authorization"));
+            resolved.headers.push((
+                "Authorization".into(),
+                masker.mask(&engine::digest::masked(header)),
+            ));
+        }
 
         let history_id = new_id("h");
         let mut entry = HistoryEntry {

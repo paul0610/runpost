@@ -8,6 +8,8 @@
 #   - sin token o con el inválido de la colección: 401 en sign; keys/local y encrypt dan 200.
 #   - DELETE /v1/<currency>/accounts/<id> en la API (la petición protegida de la demo del panel
 #     Agente): 200 con token, 401 sin él.
+#   - POST /oauth/token en la API con grant_type=client_credentials: un token OAuth 2.0 falso
+#     ("fake-oauth-token", 1 h) para probar la auth OAuth 2.0.
 # Sirve igual para Postman: importa la colección y el entorno falso, elige tokens-matriz-fake.csv en
 # su Collection Runner y compara la tabla con la de RunPost.
 # Uso: python scripts/dev/mock_acme.py
@@ -76,6 +78,15 @@ class Api(Base):
         else:
             scope = ['accounts_read'] if token == VIEW else ['accounts_read', 'accounts_sign']
             self.send(200, {'session': {'scope': scope, 'expires': '2026-12-31T00:00:00.000Z', 'ipRestrict': []}})
+
+    def do_POST(self):
+        length = int(self.headers.get('Content-Length') or 0)
+        body = self.rfile.read(length).decode('utf-8', 'replace') if length else ''
+        if self.path == '/oauth/token' and 'grant_type=client_credentials' in body:
+            self.send(200, {'access_token': 'fake-oauth-token', 'token_type': 'Bearer',
+                            'expires_in': 3600, 'scope': 'accounts_read'})
+        else:
+            self.send(404, {'error': 'not found'})
 
     def do_DELETE(self):
         parts = self.path.split('?')[0].strip('/').split('/')

@@ -499,6 +499,7 @@ mod tests {
                 ms: 143,
                 size: body.len() as u64,
                 cookies: Vec::new(),
+                digest_authorization: None,
             },
             resolved: ResolvedRequest::default(),
             tests: Vec::new(),

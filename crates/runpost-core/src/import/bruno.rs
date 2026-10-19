@@ -15,8 +15,8 @@ use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
 use crate::model::{
-    ApiKeyIn, Auth, Body, Collection, Environment, FieldKind, Folder, Item, KeyValue,
-    MultipartField, RawLang, Request, Scripts, Variable,
+    ApiKeyIn, Auth, Body, ClientAuth, Collection, Environment, FieldKind, Folder, Item, KeyValue,
+    MultipartField, OAuth2Cc, OAuth2Code, RawLang, Request, Scripts, Variable,
 };
 
 use super::{Imported, array, fill_path_params, merge_headers, split_query, stable_id, text};
@@ -1155,6 +1155,68 @@ impl Builder {
                     ApiKeyIn::Header
                 },
             },
+            "digest" => Auth::Digest {
+                username: self.fix(&attr("digest", "username")),
+                password: self.fix(&attr("digest", "password")),
+            },
+            "oauth2" => {
+                // `.bru` en snake_case, el JSON en camelCase y OpenCollection con `credentials.*`.
+                let pick = |keys: &[&str]| {
+                    keys.iter()
+                        .map(|key| attr("oauth2", key))
+                        .find(|value| !value.is_empty())
+                        .unwrap_or_default()
+                };
+                let client_id = self.fix(&pick(&["client_id", "clientId", "credentials.clientId"]));
+                let client_secret = self.fix(&pick(&[
+                    "client_secret",
+                    "clientSecret",
+                    "credentials.clientSecret",
+                ]));
+                let token_url = self.fix(&pick(&["access_token_url", "accessTokenUrl"]));
+                let scope = self.fix(&pick(&["scope"]));
+                let client_auth = if pick(&[
+                    "credentials_placement",
+                    "credentialsPlacement",
+                    "credentials.placement",
+                ]) == "body"
+                {
+                    ClientAuth::Body
+                } else {
+                    ClientAuth::Basic
+                };
+                match pick(&["grant_type", "grantType", "flow"]).as_str() {
+                    "client_credentials" => Auth::oauth2_cc(OAuth2Cc {
+                        token_url,
+                        client_id,
+                        client_secret,
+                        scope,
+                        client_auth,
+                    }),
+                    "authorization_code" => {
+                        let callback = self.fix(&pick(&["callback_url", "callbackUrl"]));
+                        Auth::oauth2_code(OAuth2Code {
+                            auth_url: self.fix(&pick(&["authorization_url", "authorizationUrl"])),
+                            token_url,
+                            client_id,
+                            client_secret,
+                            scope,
+                            redirect_uri: super::local_redirect(
+                                &callback,
+                                at,
+                                &mut self.unsupported,
+                            ),
+                            client_auth,
+                        })
+                    }
+                    grant => {
+                        self.unsupported.push(format!(
+                            "{at}: OAuth 2.0 grant {grant:?} not supported (only client credentials and authorization code), imported as none"
+                        ));
+                        Auth::None
+                    }
+                }
+            }
             other => {
                 self.unsupported.push(format!(
                     "{at}: auth {other:?} not supported yet, imported as none"

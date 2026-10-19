@@ -325,6 +325,11 @@ impl Workspace {
         &self.root
     }
 
+    /// El llavero del workspace (el del sistema o, en pruebas, uno en memoria).
+    pub fn keyring(&self) -> Arc<dyn Keyring> {
+        Arc::clone(&self.keyring)
+    }
+
     fn collections_dir(&self) -> PathBuf {
         self.root.join("collections")
     }
