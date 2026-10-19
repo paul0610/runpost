@@ -208,7 +208,7 @@ impl RunPostMcp {
     }
 
     #[tool(
-        description = "Import a Postman v2.1 collection or environment from a path or pasted text."
+        description = "Import a Postman v2.1 collection or environment from a path or pasted text; also OpenAPI 3, HAR, Insomnia and Bruno."
     )]
     async fn import_postman(
         &self,

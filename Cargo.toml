@@ -59,6 +59,7 @@ aws-lc-rs = { version = "=1.18.2", default-features = false, features = ["aws-lc
 tokio-util = "=0.7.20"
 quick-xml = "=0.42.0"
 keyring = "=4.2.0"
+yaml-rust2 = { version = "=0.13.0", default-features = false }
 runpost-core = { path = "crates/runpost-core", version = "=0.1.0" }
 runpost-server = { path = "crates/runpost-server", version = "=0.1.0" }
 runpost-mcp = { path = "crates/runpost-mcp", version = "=0.1.0" }

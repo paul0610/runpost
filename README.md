@@ -116,8 +116,11 @@ config with your paths. Examples: [docs/mcp-client-configs/](docs/mcp-client-con
 - Postman-style UI: collections, folders, tabs, params/headers/body/auth editors, environments and
   globals, history, console, markdown docs, light and dark themes, Postman shortcuts. English and
   Spanish.
-- Postman v2.1 import/export, `pm.*` pre-request and test scripts (QuickJS sandbox), Collection
-  Runner with CSV/JSON data and JUnit/HTML reports — also from the terminal (`runpost_mcp run`).
+- Import from Postman v2.1, OpenAPI 3, HAR, Insomnia (v4 and v5), Bruno (`.bru`, YAML or JSON) and
+  cURL ([what is translated](docs/IMPORT.md)); export to Postman v2.1. Code snippets (cURL, fetch,
+  PowerShell, Python) that keep secrets as `{{variables}}`, and GraphQL bodies.
+- `pm.*` pre-request and test scripts (QuickJS sandbox), Collection Runner with CSV/JSON data and
+  JUnit/HTML reports — also from the terminal (`runpost_mcp run`).
 - MCP server (stdio, or Streamable HTTP when the app is open) with 13 compact tools: refer to saved
   requests by name, `select` (JSONPath), `get_response` by ranges, `diff_against` to see only what
   changed, `run_collection` summaries.

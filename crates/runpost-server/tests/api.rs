@@ -418,7 +418,7 @@ async fn import_multipart_and_paths_export_and_agent_config() {
         .call(
             Method::POST,
             "/import",
-            Some(json!({"format": "openapi", "text": "{}"})),
+            Some(json!({"format": "raml", "text": "{}"})),
         )
         .await;
     assert_eq!(
@@ -882,5 +882,148 @@ async fn runner_runs_in_background_with_progress_report_and_cancel() {
         .call(Method::GET, "/runner/run_missing/report", None)
         .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    api.server.shutdown().await.unwrap();
+}
+
+/// Fase 4: OpenAPI (YAML), HAR y curl por `/import`; un curl vuelve como petición sin guardar.
+#[tokio::test]
+async fn import_openapi_har_and_curl() {
+    let api = Api::start().await;
+    let openapi = "openapi: 3.0.3\ninfo:\n  title: Mini\nservers:\n  - url: https://mini.test\npaths:\n  /ping:\n    get:\n      summary: Ping\n      responses:\n        '200': { description: ok }\n";
+    let result = api
+        .ok(Method::POST, "/import", Some(json!({"text": openapi})))
+        .await;
+    assert_eq!(result["reports"][0]["format"], "openapi");
+    assert_eq!(result["reports"][0]["name"], "Mini");
+    assert_eq!(result["reports"][0]["requests"], 1);
+
+    let har = json!({"log": {"version": "1.2", "entries": [
+        {"request": {"method": "GET", "url": "https://h.test/a?b=1", "headers": []}}]}});
+    let result = api
+        .ok(
+            Method::POST,
+            "/import",
+            Some(json!({"text": har.to_string()})),
+        )
+        .await;
+    assert_eq!(result["reports"][0]["format"], "har");
+
+    let curl = api
+        .ok(
+            Method::POST,
+            "/import",
+            Some(json!({"text": "curl -X POST https://h.test/x -d 'a=1'"})),
+        )
+        .await;
+    assert_eq!(curl["requests"][0]["method"], "POST");
+    assert_eq!(curl["requests"][0]["url"], "https://h.test/x");
+    assert_eq!(curl["requests"][0]["body"]["mode"], "urlencoded");
+    assert!(curl["reports"].as_array().unwrap().is_empty());
+
+    let unknown = api
+        .ok(Method::POST, "/import", Some(json!({"text": "hello"})))
+        .await;
+    assert!(
+        unknown["errors"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("unknown format"),
+        "{unknown}"
+    );
+    assert_eq!(
+        api.ok(Method::GET, "/collections", None)
+            .await
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    api.server.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn import_insomnia_and_bruno() {
+    let api = Api::start().await;
+    let insomnia_v4 = json!({
+        "_type": "export", "__export_format": 4,
+        "resources": [
+            {"_id": "wrk_1", "parentId": null, "_type": "workspace", "name": "Acme Insomnia", "scope": "collection"},
+            {"_id": "env_b", "parentId": "wrk_1", "_type": "environment", "name": "Base", "data": {"apiUrl": "http://localhost:3080"}},
+            {"_id": "env_d", "parentId": "env_b", "_type": "environment", "name": "DESA", "data": {"apiUrl": "https://desa.example.test"}},
+            {"_id": "req_1", "parentId": "wrk_1", "_type": "request", "name": "Ping", "method": "GET",
+             "url": "{{ _.apiUrl }}/v1/ping", "authentication": {}}
+        ]
+    });
+    let result = api
+        .ok(
+            Method::POST,
+            "/import",
+            Some(json!({"text": insomnia_v4.to_string()})),
+        )
+        .await;
+    let reports = result["reports"].as_array().unwrap();
+    assert_eq!(reports.len(), 2, "{result}");
+    assert_eq!(reports[0]["format"], "insomnia");
+    assert_eq!(reports[0]["kind"], "collection");
+    assert_eq!(reports[0]["requests"], 1);
+    assert_eq!(reports[1]["kind"], "environment");
+    assert_eq!(reports[1]["name"], "Acme Insomnia - DESA");
+    let id = reports[0]["id"].as_str().unwrap();
+    let collection = api
+        .ok(Method::GET, &format!("/collections/{id}"), None)
+        .await;
+    assert_eq!(collection["items"][0]["url"], "{{apiUrl}}/v1/ping");
+
+    let insomnia_v5 = "type: collection.insomnia.rest/5.0\nname: Acme v5\nmeta:\n  id: wrk_5\ncollection:\n  - url: \"{{ _.apiUrl }}/v1/session\"\n    name: Session\n    meta:\n      id: req_5\n    method: GET\n";
+    let result = api
+        .ok(Method::POST, "/import", Some(json!({"text": insomnia_v5})))
+        .await;
+    assert_eq!(result["reports"][0]["format"], "insomnia");
+    assert_eq!(result["reports"][0]["name"], "Acme v5");
+
+    let bruno_json = json!({
+        "version": "1", "name": "Acme Bruno",
+        "items": [{"type": "http", "name": "Ping", "seq": 1, "request": {
+            "url": "{{apiUrl}}/v1/ping", "method": "GET", "auth": {"mode": "inherit"},
+            "assertions": [{"name": "res.status", "value": "eq 200", "enabled": true}]}}],
+        "environments": [{"name": "Local", "variables": [
+            {"name": "apiUrl", "value": "http://localhost:3080", "enabled": true, "secret": false}]}]
+    });
+    let result = api
+        .ok(
+            Method::POST,
+            "/import",
+            Some(json!({"text": bruno_json.to_string()})),
+        )
+        .await;
+    assert_eq!(result["reports"][0]["format"], "bruno");
+    assert_eq!(result["reports"][1]["name"], "Acme Bruno - Local");
+
+    // Carpeta de Bruno por ruta (la app de escritorio manda la ruta del `bruno.json`).
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("bruno.json"),
+        r#"{"version": "1", "name": "Acme Folder", "type": "collection"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("Ping.bru"),
+        "meta {\n  name: Ping\n  seq: 1\n}\n\nget {\n  url: {{apiUrl}}/v1/ping\n  auth: inherit\n}\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join(".env"), "TOKEN=fake-not-read\n").unwrap();
+    let path = dir.path().join("bruno.json").to_string_lossy().into_owned();
+    let result = api
+        .ok(Method::POST, "/import", Some(json!({"path": path})))
+        .await;
+    assert_eq!(result["reports"][0]["format"], "bruno", "{result}");
+    assert_eq!(result["reports"][0]["name"], "Acme Folder");
+    assert_eq!(result["reports"][0]["replaced"], false);
+    // Reimportar la misma carpeta sustituye la colección.
+    let again = api
+        .ok(Method::POST, "/import", Some(json!({"path": path})))
+        .await;
+    assert_eq!(again["reports"][0]["replaced"], true);
+    assert_eq!(again["reports"][0]["id"], result["reports"][0]["id"]);
     api.server.shutdown().await.unwrap();
 }

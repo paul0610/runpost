@@ -2,7 +2,7 @@
   // Estado vacío (P2): Importar de Postman · Nueva petición · Conectar tu agente.
   import { store } from '../stores/app.svelte';
   import { t } from '../i18n.svelte';
-  import { importFromPostman } from '../importer';
+  import { openImport } from '../importer';
 
   function agent(event: MouseEvent): void {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -13,7 +13,7 @@
 <div class="empty">
   <div>
     <div class="cards">
-      <button class="card" onclick={importFromPostman}>
+      <button class="card" onclick={openImport}>
         <div class="ic">⬇</div>
         <b>{t('empty.import')}</b>
         <span>{t('empty.importHint')}</span>

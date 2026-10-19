@@ -933,3 +933,26 @@ describe('snippets (fase 4)', () => {
     expect(JSON.parse(localStorage.getItem('runpost.ui') ?? '{}')).toMatchObject({ code: true, codeLang: 'python' });
   });
 });
+
+describe('importar (fase 4)', () => {
+  it('un cURL pegado se abre en una pestaña nueva sin guardar', async () => {
+    responses['POST /import'] = {
+      reports: [],
+      errors: [],
+      requests: [{ ...emptyRequest('https://h.test/x'), id: 'req_server', method: 'POST', url: 'https://h.test/x' }],
+    };
+    expect(await store.importText('curl -X POST https://h.test/x')).toBe(true);
+    expect(calls.find((c) => c.path === '/import')?.body).toEqual({ text: 'curl -X POST https://h.test/x' });
+    const tab = tabAt('request');
+    expect(tab.requestId).toBeNull();
+    expect(tab.draft.method).toBe('POST');
+    expect(tab.draft.url).toBe('https://h.test/x');
+  });
+
+  it('un texto que no se pudo importar avisa y deja el diálogo abierto', async () => {
+    responses['POST /import'] = { reports: [], errors: [{ file: 'text', message: 'unknown format' }], requests: [] };
+    expect(await store.importText('hola')).toBe(false);
+    expect(store.toasts.at(-1)).toMatchObject({ kind: 'err' });
+    expect(await store.importText('   ')).toBe(false);
+  });
+});

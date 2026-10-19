@@ -19,7 +19,10 @@ pub use watcher::WorkspaceEvent;
 
 use crate::{
     error::CoreError,
-    import::postman_v21::{self, PostmanKind},
+    import::{
+        self, Format, Imported, bruno,
+        postman_v21::{self, PostmanKind},
+    },
     model::{
         Collection, Environment, Globals, Item, Request, SCHEMA, SecretStore, Settings, Variable,
         new_id,
@@ -68,6 +71,8 @@ impl From<&str> for RequestSelector {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ImportReport {
     pub kind: PostmanKind,
+    /// Formato de origen: `postman_v21`, `openapi`, `har`, `insomnia` o `bruno`.
+    pub format: &'static str,
     pub id: String,
     pub name: String,
     pub folders: usize,
@@ -650,53 +655,18 @@ impl Workspace {
         match kind {
             PostmanKind::Collection => {
                 let imported = postman_v21::import_collection_value(&value)?;
-                let mut collection = imported.collection;
-                let previous = self.load_collection(&collection.id).ok();
-                if let Some(previous) = &previous {
-                    reuse_ids(previous, &mut collection);
-                }
-                let path = self.save_collection_as(&collection, preferred_slug)?;
-                Ok(ImportReport {
-                    kind,
-                    folders: collection.folder_count(),
-                    requests: collection.request_count(),
-                    variables: collection.variables.len(),
-                    id: collection.id,
-                    name: collection.name,
-                    file: self.relative(&path),
-                    replaced: previous.is_some(),
-                    warnings: imported.warnings,
-                })
+                self.save_imported_collection(
+                    imported.collection,
+                    imported.warnings,
+                    Format::Postman,
+                    preferred_slug,
+                )
             }
-            PostmanKind::Environment => {
-                let mut env = postman_v21::import_environment_value(&value)?;
-                let previous = self.find_environment(&env.id).ok();
-                // Reimportar no saca del llavero lo que el usuario ya movió ahí.
-                if let Some(previous) = &previous {
-                    for var in env.variables.iter_mut().filter(|v| v.secret) {
-                        if previous
-                            .variables
-                            .iter()
-                            .any(|old| old.key == var.key && in_keyring(old))
-                        {
-                            var.store = Some(SecretStore::Keyring);
-                        }
-                    }
-                }
-                let replaced = previous.is_some();
-                let path = self.save_environment_as(&env, preferred_slug)?;
-                Ok(ImportReport {
-                    kind,
-                    folders: 0,
-                    requests: 0,
-                    variables: env.variables.len(),
-                    id: env.id,
-                    name: env.name,
-                    file: self.relative(&path),
-                    replaced,
-                    warnings: Vec::new(),
-                })
-            }
+            PostmanKind::Environment => self.save_imported_environment(
+                postman_v21::import_environment_value(&value)?,
+                Format::Postman,
+                preferred_slug,
+            ),
         }
     }
 
@@ -709,18 +679,175 @@ impl Workspace {
     ) -> Result<ImportReport> {
         let text = std::fs::read_to_string(file)
             .with_context(|| format!("cannot read {}", file.display()))?;
-        let stem = file.file_name().unwrap_or_default().to_string_lossy();
-        let stem = [
-            ".postman_collection.json",
-            ".postman_environment.json",
-            ".json",
-        ]
-        .iter()
-        .find_map(|ext| stem.strip_suffix(ext))
-        .unwrap_or(&stem)
-        .to_owned();
-        self.import_postman(&text, kind, Some(&stem))
+        self.import_postman(&text, kind, Some(&import_stem(file)))
     }
+
+    /// Importa un texto en cualquier formato (fase 4): Postman v2.1, OpenAPI 3, HAR, Insomnia o
+    /// Bruno (JSON); se detecta si `format` es `None`. Un comando curl no: es una petición suelta
+    /// (`import::curl::parse`) que la app abre en una pestaña.
+    pub fn import(
+        &self,
+        text: &str,
+        format: Option<Format>,
+        kind: Option<PostmanKind>,
+        preferred_slug: Option<&str>,
+    ) -> Result<Vec<ImportReport>> {
+        let format = match format {
+            Some(format) => format,
+            None => import::detect(text).context(
+                "unknown format: expected Postman v2.1, OpenAPI 3, HAR, Insomnia, Bruno or curl",
+            )?,
+        };
+        let imported = match format {
+            Format::Postman => return Ok(vec![self.import_postman(text, kind, preferred_slug)?]),
+            Format::Curl => {
+                return Err(CoreError::InvalidRequest(
+                    "a curl command is a single request: open it in a tab".into(),
+                )
+                .into());
+            }
+            Format::Openapi => import::openapi::import(&import::parse_document(text)?)?,
+            Format::Har => import::har::import(&import::parse_document(text)?)?,
+            Format::Insomnia => import::insomnia::import(&import::parse_document(text)?)?,
+            Format::Bruno => bruno::import_json(&import::parse_document(text)?)?,
+        };
+        self.save_imported(imported, format, preferred_slug)
+    }
+
+    /// Como `import` desde una ruta. Una carpeta de colección de Bruno (o su `bruno.json`) se
+    /// importa entera.
+    pub fn import_path(
+        &self,
+        path: &Path,
+        format: Option<Format>,
+        kind: Option<PostmanKind>,
+    ) -> Result<Vec<ImportReport>> {
+        if let Some(root) = bruno::collection_root(path) {
+            let imported = bruno::import_folder(&root)?;
+            let slug = root.file_name().map(|n| n.to_string_lossy().into_owned());
+            return self.save_imported(imported, Format::Bruno, slug.as_deref());
+        }
+        let text = std::fs::read_to_string(path)
+            .with_context(|| format!("cannot read {}", path.display()))?;
+        self.import(&text, format, kind, Some(&import_stem(path)))
+    }
+
+    /// Guarda lo importado; los avisos van en el primer informe.
+    fn save_imported(
+        &self,
+        imported: Imported,
+        format: Format,
+        preferred_slug: Option<&str>,
+    ) -> Result<Vec<ImportReport>> {
+        let Imported {
+            collections,
+            environments,
+            mut warnings,
+        } = imported;
+        let single = collections.len() == 1;
+        let mut reports = Vec::new();
+        for collection in collections {
+            let slug = if single { preferred_slug } else { None };
+            reports.push(self.save_imported_collection(
+                collection,
+                std::mem::take(&mut warnings),
+                format,
+                slug,
+            )?);
+        }
+        for environment in environments {
+            reports.push(self.save_imported_environment(environment, format, None)?);
+        }
+        if let Some(first) = reports.first_mut() {
+            first.warnings.append(&mut warnings);
+        }
+        Ok(reports)
+    }
+
+    /// Reimportar la misma colección (mismo id) la sustituye y conserva los ids de las carpetas y
+    /// peticiones cuya ruta no cambió.
+    fn save_imported_collection(
+        &self,
+        mut collection: Collection,
+        warnings: Vec<String>,
+        format: Format,
+        preferred_slug: Option<&str>,
+    ) -> Result<ImportReport> {
+        let previous = self.load_collection(&collection.id).ok();
+        if let Some(previous) = &previous {
+            reuse_ids(previous, &mut collection);
+        }
+        let path = self.save_collection_as(&collection, preferred_slug)?;
+        Ok(ImportReport {
+            kind: PostmanKind::Collection,
+            format: format.as_str(),
+            folders: collection.folder_count(),
+            requests: collection.request_count(),
+            variables: collection.variables.len(),
+            id: collection.id,
+            name: collection.name,
+            file: self.relative(&path),
+            replaced: previous.is_some(),
+            warnings,
+        })
+    }
+
+    fn save_imported_environment(
+        &self,
+        mut env: Environment,
+        format: Format,
+        preferred_slug: Option<&str>,
+    ) -> Result<ImportReport> {
+        let previous = self.find_environment(&env.id).ok();
+        // Reimportar no saca del llavero lo que el usuario ya movió ahí.
+        if let Some(previous) = &previous {
+            for var in env.variables.iter_mut().filter(|v| v.secret) {
+                if previous
+                    .variables
+                    .iter()
+                    .any(|old| old.key == var.key && in_keyring(old))
+                {
+                    var.store = Some(SecretStore::Keyring);
+                }
+            }
+        }
+        let replaced = previous.is_some();
+        let path = self.save_environment_as(&env, preferred_slug)?;
+        Ok(ImportReport {
+            kind: PostmanKind::Environment,
+            format: format.as_str(),
+            folders: 0,
+            requests: 0,
+            variables: env.variables.len(),
+            id: env.id,
+            name: env.name,
+            file: self.relative(&path),
+            replaced,
+            warnings: Vec::new(),
+        })
+    }
+}
+
+/// Slug de un archivo importado: `Acme-Gateway-Scopes.postman_collection.json` → `Acme-Gateway-Scopes`.
+pub fn import_stem(file: &Path) -> String {
+    let name = file.file_name().unwrap_or_default().to_string_lossy();
+    [
+        ".postman_collection.json",
+        ".postman_environment.json",
+        ".openapi.json",
+        ".openapi.yaml",
+        ".insomnia.json",
+        ".insomnia.yaml",
+        ".insomnia.yml",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".har",
+    ]
+    .iter()
+    .find_map(|ext| name.strip_suffix(ext))
+    .unwrap_or(&name)
+    .to_owned()
 }
 
 /// Copia los ids de `previous` a `fresh` para los elementos con la misma ruta.

@@ -251,6 +251,8 @@ export interface HistoryEntry extends HistorySummary {
 
 export interface ImportReport {
   kind: 'collection' | 'environment';
+  /** `postman_v21`, `openapi`, `har`, `insomnia` o `bruno`. */
+  format: string;
   id: string;
   name: string;
   folders: number;
@@ -264,6 +266,8 @@ export interface ImportReport {
 export interface ImportResult {
   reports: ImportReport[];
   errors: { file: string; message: string }[];
+  /** Comandos cURL: peticiones sin guardar que la app abre en pestañas. */
+  requests?: Request[];
 }
 
 export interface AgentConfig {

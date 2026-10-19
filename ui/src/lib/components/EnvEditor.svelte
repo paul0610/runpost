@@ -6,7 +6,7 @@
   import { tick } from 'svelte';
   import { GLOBALS, store, type EnvTab } from '../stores/app.svelte';
   import { t } from '../i18n.svelte';
-  import { importFromPostman } from '../importer';
+  import { openImport } from '../importer';
 
   let { tab }: { tab: EnvTab } = $props();
   let body = $state<HTMLTableSectionElement>();
@@ -64,7 +64,7 @@
     <span class="spacer"></span>
     <button onclick={() => addVariable()}>＋ {t('env.newVariable')}</button>
     <button disabled={fileSecrets === 0} title={t('env.moveAllTitle')} onclick={() => store.moveToKeyring(tab)}>🔒 {t('env.moveAll')}</button>
-    <button onclick={importFromPostman}>{t('env.import')}</button>
+    <button onclick={openImport}>{t('env.import')}</button>
     <button disabled={globals || !env} onclick={() => env && store.exportEnvironment(env)}>{t('env.export')}</button>
     <button class="primary" disabled={!store.isDirty(tab)} onclick={() => store.saveTab(tab)}>{t('req.save')}</button>
   </header>

@@ -88,6 +88,64 @@ fn import_export_reimport_round_trip() {
 }
 
 #[test]
+fn import_bruno_folders_and_insomnia_files() {
+    let workspace = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    let bruno = source.path().join("acme-bruno");
+    std::fs::create_dir_all(bruno.join("Accounts")).unwrap();
+    std::fs::create_dir_all(bruno.join("environments")).unwrap();
+    std::fs::write(
+        bruno.join("bruno.json"),
+        r#"{"version": "1", "name": "Acme Bruno", "type": "collection"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        bruno.join("Accounts/Sign.bru"),
+        "meta {\n  name: Sign\n  seq: 1\n}\n\npost {\n  url: {{apiUrl}}/v1/usd/accounts/acc_1/sign\n  body: json\n  auth: inherit\n}\n\nbody:json {\n  {}\n}\n\nscript:pre-request {\n  bru.setVar(\"a\", 1);\n}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        bruno.join("environments/Local.bru"),
+        "vars {\n  apiUrl: http://localhost:3080\n}\nvars:secret [\n  accessToken\n]\n",
+    )
+    .unwrap();
+    let output = runpost(workspace.path(), &["import", bruno.to_str().unwrap()]);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("colección importada [bruno]: \"Acme Bruno\""),
+        "{stdout}"
+    );
+    assert!(stdout.contains("con 1 carpetas y 1 peticiones"), "{stdout}");
+    assert!(stdout.contains("entorno importado [bruno]: \"Acme Bruno - Local\""));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("Bruno scripts kept as comments"),
+        "{stderr}"
+    );
+
+    // Reimportar la carpeta la sustituye.
+    let output = runpost(workspace.path(), &["import", bruno.to_str().unwrap()]);
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("colección reemplazada [bruno]")
+    );
+
+    let insomnia = source.path().join("acme.insomnia.yaml");
+    std::fs::write(
+        &insomnia,
+        "type: collection.insomnia.rest/5.0\nname: Acme Insomnia\nmeta:\n  id: wrk_cli\ncollection:\n  - url: \"{{ _.apiUrl }}/v1/ping\"\n    name: Ping\n    meta:\n      id: req_cli\n    method: GET\n",
+    )
+    .unwrap();
+    let output = runpost(workspace.path(), &["import", insomnia.to_str().unwrap()]);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("colección importada [insomnia]: \"Acme Insomnia\""),
+        "{stdout}"
+    );
+}
+
+#[test]
 fn export_unknown_collection_fails_cleanly() {
     let dir = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_runpost_mcp"))

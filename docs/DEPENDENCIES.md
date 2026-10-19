@@ -111,3 +111,14 @@ por lo que reportó falsos huérfanos. Se verificó el lockfile con JSON estánd
 el auditor reproducible anterior: 73 entradas de UI (48 instaladas en Windows),
 12 de desktop (2 instaladas), **0 huérfanos**. Las demás entradas son opcionales
 de otras plataformas. No se borraron dependencias para ocultar hallazgos.
+
+## Sprint 8
+
+| Cargo (dependencia directa nueva) | Versión | Publicación (UTC) |
+|---|---|---|
+| yaml-rust2 (`default-features = false`) | 0.13.0 | 2026-09-11 |
+
+Lee los documentos YAML que se importan (OpenAPI 3, Insomnia v5 y las colecciones OpenCollection de
+Bruno). Solo añade la transitiva `arraydeque` 0.5.1 (2023-02-05). Consulta del 2026-10-18 en
+crates.io y OSV: ambas versiones superan los siete días y no tienen avisos. Los ids estables de las
+importaciones (SHA-256) usan `aws-lc-rs`, que ya estaba.

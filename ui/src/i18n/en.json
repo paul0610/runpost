@@ -298,7 +298,7 @@
   },
   "empty": {
     "import": "Import from Postman",
-    "importHint": "Collection and environment v2.1, together.",
+    "importHint": "Postman, OpenAPI, HAR, Insomnia, Bruno or a cURL command.",
     "newRequest": "New request",
     "newRequestHint": "Start with a GET. Ctrl+T.",
     "agent": "Connect your agent",
@@ -395,7 +395,18 @@
     "doneReplaced": "Updated \"{name}\": {count} requests",
     "doneEnv": "Environment \"{name}\" imported: {count} variables",
     "failed": "Could not import {file}: {message}",
-    "warnings": "{count} warnings: {first}"
+    "warnings": "{count} warnings: {first}",
+    "title": "Import",
+    "pasteLabel": "Paste a cURL command or the content of a collection",
+    "pastePlaceholder": "curl https://api.example.com/v1/items -H 'Accept: application/json'\n\n…or a Postman, OpenAPI (JSON/YAML), HAR, Insomnia or Bruno export.",
+    "importText": "Import",
+    "or": "or",
+    "chooseFiles": "Choose files…",
+    "formats": "Postman v2.1 (collections and environments) · OpenAPI 3 (JSON or YAML) · HAR · Insomnia (v4 and v5) · Bruno (.bru, YAML or JSON) · cURL.",
+    "brunoHint": "A Bruno collection stored in a folder: choose its bruno.json or opencollection.yml file.",
+    "brunoHintBrowser": "Bruno: export the collection to a single file, JSON or YAML (folders need the desktop app).",
+    "close": "Close",
+    "curlOpened": "cURL opened in a new tab. Save it to keep it."
   },
   "palette": {
     "placeholder": "Search requests, environments or actions…",

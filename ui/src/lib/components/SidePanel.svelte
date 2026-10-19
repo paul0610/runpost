@@ -4,7 +4,7 @@
   import { t } from '../i18n.svelte';
   import { collectionMenu, environmentMenu, historyMenu, menuPoint } from '../menus';
   import { DND_TYPE, drag } from '../dnd';
-  import { importFromPostman } from '../importer';
+  import { openImport } from '../importer';
   import { methodClass, methodLabel, statusClass } from '../format';
   import TreeNode from './TreeNode.svelte';
   import AgentPanel from './AgentPanel.svelte';
@@ -91,7 +91,7 @@
     <header>
       {t('rail.collections')}
       <span class="spacer"></span>
-      <button class="ghost" title={t('side.importTitle')} onclick={importFromPostman}>{t('side.import')}</button>
+      <button class="ghost" title={t('side.importTitle')} onclick={openImport}>{t('side.import')}</button>
       <button class="ghost" title={t('side.newCollection')} aria-label={t('side.newCollection')} onclick={() => store.createCollection()}>＋</button>
     </header>
     <div class="body tree" role="tree" aria-label={t('rail.collections')} bind:this={tree} onkeydown={treeKey} tabindex="-1">

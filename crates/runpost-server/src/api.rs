@@ -12,10 +12,11 @@ use axum::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use runpost_core::{
-    CLI_BIN, CoreError, Executor, NetworkError, RequestDraft, RunContext, Source,
+    CLI_BIN, CoreError, Executor, ImportReport, NetworkError, RequestDraft, RunContext, Source,
     codegen::Lang,
     executor::snippet,
     export::postman_v21::{export_collection, export_environment},
+    import::Format,
     import::postman_v21::PostmanKind,
     model::{Collection, Environment, Globals, Item, Position, Request as SavedRequest, Settings},
     storage::{HistoryEntry, fs::write_atomic},
@@ -598,27 +599,90 @@ fn parse_kind(kind: Option<&str>) -> Result<Option<PostmanKind>, ApiError> {
         .transpose()
 }
 
-fn check_format(format: Option<&str>) -> Result<(), ApiError> {
-    match format {
-        None | Some("") | Some("postman_v21") => Ok(()),
-        Some(other) => Err(ApiError::new(
-            StatusCode::BAD_REQUEST,
-            "unsupported_format",
-            format!("{other} (only postman_v21 in v1; curl and openapi arrive in phase 4)"),
-        )),
+fn check_format(format: Option<&str>) -> Result<Option<Format>, ApiError> {
+    match format.filter(|f| !f.is_empty()) {
+        None => Ok(None),
+        Some(name) => Format::parse(name).map(Some).ok_or_else(|| {
+            ApiError::new(
+                StatusCode::BAD_REQUEST,
+                "unsupported_format",
+                format!("{name} (postman_v21, openapi, har, insomnia, bruno or curl)"),
+            )
+        }),
+    }
+}
+
+/// Lo que devuelve `/import`: informes, errores por archivo y las peticiones de curl (sin guardar;
+/// la app las abre en pestañas, como Postman).
+#[derive(Default)]
+struct ImportOutcome {
+    reports: Vec<ImportReport>,
+    errors: Vec<Value>,
+    requests: Vec<SavedRequest>,
+}
+
+impl ImportOutcome {
+    /// Un texto (archivo subido o pegado) en cualquier formato.
+    fn text(
+        &mut self,
+        ws: &runpost_core::Workspace,
+        source: &str,
+        text: &str,
+        format: Option<Format>,
+        kind: Option<PostmanKind>,
+        slug: Option<&str>,
+    ) {
+        let is_curl = format == Some(Format::Curl)
+            || (format.is_none() && runpost_core::import::curl::looks_like(text.trim_start()));
+        let result = if is_curl {
+            runpost_core::import::curl::parse(text).map(|request| self.requests.push(request))
+        } else {
+            ws.import(text, format, kind, slug)
+                .map(|reports| self.reports.extend(reports))
+        };
+        if let Err(error) = result {
+            self.errors
+                .push(json!({"file": source, "message": format!("{error:#}")}));
+        }
+    }
+
+    /// Una ruta del disco: archivo o colección de Bruno (carpeta o su `bruno.json`).
+    fn path(
+        &mut self,
+        ws: &runpost_core::Workspace,
+        path: &str,
+        format: Option<Format>,
+        kind: Option<PostmanKind>,
+    ) {
+        let file = PathBuf::from(path);
+        let text = if file.is_file() {
+            std::fs::read_to_string(&file).ok()
+        } else {
+            None
+        };
+        if let Some(text) = text.filter(|t| runpost_core::import::curl::looks_like(t.trim_start()))
+        {
+            return self.text(ws, path, &text, Some(Format::Curl), kind, None);
+        }
+        match ws.import_path(&file, format, kind) {
+            Ok(reports) => self.reports.extend(reports),
+            Err(error) => self
+                .errors
+                .push(json!({"file": path, "message": format!("{error:#}")})),
+        }
     }
 }
 
 /// `multipart/form-data` (campos `file`, `kind`, `format`) o JSON `{path|paths|text, kind, format}`.
-/// Acepta varios archivos a la vez (colección y entorno, R1 de docs/UX.md).
+/// Acepta varios archivos a la vez (colección y entorno, R1 de docs/UX.md) y, desde la fase 4,
+/// OpenAPI 3, HAR, Insomnia, Bruno y comandos curl.
 async fn import(State(state): State<AppState>, request: Request) -> ApiResult {
     let is_multipart = request
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .is_some_and(|ct| ct.starts_with("multipart/form-data"));
-    let mut reports = Vec::new();
-    let mut errors = Vec::new();
+    let mut outcome = ImportOutcome::default();
     let ws = &state.workspace;
     if is_multipart {
         let mut multipart = Multipart::from_request(request, &state)
@@ -643,50 +707,31 @@ async fn import(State(state): State<AppState>, request: Request) -> ApiResult {
                 _ => files.push((file_name, text)),
             }
         }
-        check_format(format.as_deref())?;
+        let format = check_format(format.as_deref())?;
         let kind = parse_kind(kind.as_deref())?;
         for (file_name, text) in files {
-            let stem = [
-                ".postman_collection.json",
-                ".postman_environment.json",
-                ".json",
-            ]
-            .iter()
-            .find_map(|ext| file_name.strip_suffix(ext))
-            .unwrap_or(&file_name)
-            .to_owned();
-            match ws.import_postman(&text, kind, Some(&stem)) {
-                Ok(report) => reports.push(report),
-                Err(error) => {
-                    errors.push(json!({"file": file_name, "message": format!("{error:#}")}))
-                }
-            }
+            let stem = runpost_core::storage::import_stem(std::path::Path::new(&file_name));
+            outcome.text(ws, &file_name, &text, format, kind, Some(&stem));
         }
     } else {
         let Body(body) = Body::<ImportJson>::from_request(request, &state).await?;
-        check_format(body.format.as_deref())?;
+        let format = check_format(body.format.as_deref())?;
         let kind = parse_kind(body.kind.as_deref())?;
         let mut paths = body.paths;
         paths.extend(body.path);
         for path in paths {
-            match ws.import_postman_file(&PathBuf::from(&path), kind) {
-                Ok(report) => reports.push(report),
-                Err(error) => errors.push(json!({"file": path, "message": format!("{error:#}")})),
-            }
+            outcome.path(ws, &path, format, kind);
         }
         if let Some(text) = body.text {
-            match ws.import_postman(&text, kind, None) {
-                Ok(report) => reports.push(report),
-                Err(error) => errors.push(json!({"file": "text", "message": format!("{error:#}")})),
-            }
+            outcome.text(ws, "text", &text, format, kind, None);
         }
     }
-    if reports.is_empty() && errors.is_empty() {
+    if outcome.reports.is_empty() && outcome.errors.is_empty() && outcome.requests.is_empty() {
         return Err(ApiError::bad_request(
             "nothing to import: send a file, path, paths or text",
         ));
     }
-    ok(json!({"reports": reports, "errors": errors}))
+    ok(json!({"reports": outcome.reports, "errors": outcome.errors, "requests": outcome.requests}))
 }
 
 #[derive(Deserialize)]

@@ -307,6 +307,8 @@ class AppStore {
     palette: false,
     settings: false,
     about: false,
+    /** Diálogo Importar (fase 4): pegar texto o elegir archivos. */
+    importOpen: false,
     /** Panel "Código" (snippets) a la derecha del editor, como en Postman. */
     code: false,
     codeLang: 'curl' as SnippetLang,
@@ -1462,6 +1464,35 @@ class AppStore {
         const form = new FormData();
         for (const file of picked.files) form.append('file', file, file.name);
         result = await api.post<ImportResult>('/import', form);
+      }
+      await this.applyImport(result);
+    } catch (error) {
+      this.toastError(error);
+    }
+  }
+
+  /**
+   * Texto pegado en el diálogo Importar (fase 4): un comando cURL o el contenido de una colección
+   * Postman, OpenAPI, HAR, Insomnia o Bruno. `true` si se importó o abrió algo.
+   */
+  async importText(text: string): Promise<boolean> {
+    if (!text.trim()) return false;
+    try {
+      const result = await api.post<ImportResult>('/import', { text });
+      await this.applyImport(result);
+      return result.reports.length > 0 || (result.requests?.length ?? 0) > 0;
+    } catch (error) {
+      this.toastError(error);
+      return false;
+    }
+  }
+
+  /** Avisos, recarga y, para un cURL, la petición en una pestaña nueva sin guardar (como Postman). */
+  private async applyImport(result: ImportResult): Promise<void> {
+    try {
+      for (const request of result.requests ?? []) {
+        this.newTab({ ...normalizeRequest(request), id: '' });
+        this.toast('ok', t('import.curlOpened'));
       }
       for (const report of result.reports) {
         if (report.kind === 'collection') {

@@ -475,6 +475,14 @@ async function s8() {
       row('GraphQL - cuenta').click(); await wait(500);
       [...document.querySelectorAll('.subtabs [role=tab]')].find(b => b.textContent.startsWith('Body')).click(); await wait(600);`);
     await shot(`app-graphql-${theme}.png`);
+    // Importar: un cURL pegado se abre en una pestaña nueva sin guardar.
+    const curl = "curl 'https://api.acme.test/v1/accounts?page=2' -H 'Accept: application/json' -H 'Authorization: Bearer {{accessToken}}'";
+    await evaluate(`[...document.querySelectorAll('.side button')].find(b => b.textContent.includes('Importar')).click(); await wait(300);
+      const area = document.querySelector('.dialog textarea'); area.value = ${JSON.stringify(curl)};
+      area.dispatchEvent(new Event('input', { bubbles: true })); await wait(300);`);
+    await shot(`app-import-${theme}.png`);
+    await evaluate(`document.querySelector('.dialog button.primary').click(); await wait(900);`);
+    await shot(`app-import-curl-${theme}.png`);
   }
 }
 

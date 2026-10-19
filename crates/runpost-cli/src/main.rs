@@ -79,7 +79,9 @@ enum Command {
         #[arg(short, long, value_name = "FILE")]
         output: Option<PathBuf>,
     },
-    #[command(about = "Importa una colección o entorno Postman v2.1 al workspace")]
+    #[command(
+        about = "Importa al workspace una colección o entorno Postman v2.1, OpenAPI 3, HAR, Insomnia o Bruno (archivo o carpeta)"
+    )]
     Import {
         file: PathBuf,
         /// Por defecto se detecta por el contenido.
@@ -229,32 +231,37 @@ async fn execute(cli: Cli) -> Result<ExitCode> {
                 Kind::Collection => PostmanKind::Collection,
                 Kind::Environment => PostmanKind::Environment,
             });
-            let report = workspace.import_postman_file(&file, kind)?;
-            for warning in &report.warnings {
-                eprintln!("{APP_SLUG}: aviso: {warning}");
-            }
-            let action = if report.replaced {
-                "reemplazada"
-            } else {
-                "importada"
-            };
-            match report.kind {
-                PostmanKind::Collection => println!(
-                    "colección {action}: \"{}\" ({}) con {} carpetas y {} peticiones -> {}",
-                    report.name, report.id, report.folders, report.requests, report.file
-                ),
-                PostmanKind::Environment => println!(
-                    "entorno {}: \"{}\" ({}) con {} variables -> {}",
-                    if report.replaced {
-                        "reemplazado"
-                    } else {
-                        "importado"
-                    },
-                    report.name,
-                    report.id,
-                    report.variables,
-                    report.file
-                ),
+            for report in workspace.import_path(&file, None, kind)? {
+                for warning in &report.warnings {
+                    eprintln!("{APP_SLUG}: aviso: {warning}");
+                }
+                let from = match report.format {
+                    "postman_v21" => String::new(),
+                    other => format!(" [{other}]"),
+                };
+                let action = if report.replaced {
+                    "reemplazada"
+                } else {
+                    "importada"
+                };
+                match report.kind {
+                    PostmanKind::Collection => println!(
+                        "colección {action}{from}: \"{}\" ({}) con {} carpetas y {} peticiones -> {}",
+                        report.name, report.id, report.folders, report.requests, report.file
+                    ),
+                    PostmanKind::Environment => println!(
+                        "entorno {}{from}: \"{}\" ({}) con {} variables -> {}",
+                        if report.replaced {
+                            "reemplazado"
+                        } else {
+                            "importado"
+                        },
+                        report.name,
+                        report.id,
+                        report.variables,
+                        report.file
+                    ),
+                }
             }
         }
         Command::Export {

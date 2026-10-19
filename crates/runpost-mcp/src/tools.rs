@@ -1027,21 +1027,30 @@ impl Tools {
             ),
             None => None,
         };
-        let report = match (&p.path, &p.text) {
-            (Some(path), _) => self.ws.import_postman_file(Path::new(path), kind),
-            (None, Some(text)) => self.ws.import_postman(text, kind, None),
+        let reports = match (&p.path, &p.text) {
+            (Some(path), _) => self.ws.import_path(Path::new(path), None, kind),
+            (None, Some(text)) => self.ws.import(text, None, kind, None),
             (None, None) => return Err(error("invalid_request", "pass path or text")),
         }
         .map_err(|e| self.fail(&e))?;
-        let mut out = json!({"id": report.id, "name": report.name});
-        match report.kind {
-            PostmanKind::Collection => out["requests"] = json!(report.requests),
-            PostmanKind::Environment => out["vars"] = json!(report.variables),
-        }
-        if !report.warnings.is_empty() {
-            out["warnings"] = json!(report.warnings.iter().take(5).collect::<Vec<_>>());
-        }
-        Ok(out)
+        let summary = |report: &runpost_core::ImportReport| {
+            let mut out = json!({"id": report.id, "name": report.name});
+            match report.kind {
+                PostmanKind::Collection => out["requests"] = json!(report.requests),
+                PostmanKind::Environment => out["vars"] = json!(report.variables),
+            }
+            if report.format != "postman_v21" {
+                out["format"] = json!(report.format);
+            }
+            if !report.warnings.is_empty() {
+                out["warnings"] = json!(report.warnings.iter().take(5).collect::<Vec<_>>());
+            }
+            out
+        };
+        Ok(match reports.as_slice() {
+            [one] => summary(one),
+            many => json!({"imported": many.iter().map(summary).collect::<Vec<_>>()}),
+        })
     }
 
     pub fn history(&self, p: params::History) -> Reply {

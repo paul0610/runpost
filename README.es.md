@@ -117,8 +117,11 @@ con tus rutas. Ejemplos en [docs/mcp-client-configs/](docs/mcp-client-configs/),
 - Interfaz tipo Postman: colecciones, carpetas, pestañas, editores de params/cabeceras/cuerpo/auth,
   entornos y globales, historial, consola, documentación markdown, tema claro y oscuro, atajos de
   Postman. En español e inglés.
-- Importar/exportar Postman v2.1, scripts `pm.*` Pre-request y Tests (sandbox QuickJS), Collection
-  Runner con datos CSV/JSON e informes JUnit/HTML, también desde la terminal (`runpost_mcp run`).
+- Importar desde Postman v2.1, OpenAPI 3, HAR, Insomnia (v4 y v5), Bruno (`.bru`, YAML o JSON) y
+  cURL ([qué se traduce](docs/IMPORT.md)); exportar a Postman v2.1. Snippets de código (cURL, fetch,
+  PowerShell, Python) que dejan los secretos como `{{variables}}`, y cuerpos GraphQL.
+- Scripts `pm.*` Pre-request y Tests (sandbox QuickJS), Collection Runner con datos CSV/JSON e
+  informes JUnit/HTML, también desde la terminal (`runpost_mcp run`).
 - Servidor MCP (stdio, o Streamable HTTP con la app abierta) con 13 tools compactas: peticiones
   guardadas por nombre, `select` (JSONPath), `get_response` por rangos, `diff_against` para ver solo lo
   que cambió, resúmenes de `run_collection`.
@@ -207,7 +210,7 @@ conservan un `RUNPOST_WORKSPACE` existente y pasan sus argumentos al ejecutable:
 .\target\release\runpost_mcp.exe serve --browser --port 7878 --workspace D:\datos\runpost
 ```
 
-#### Importar y exportar Postman v2.1
+#### Importar y exportar
 
 ```powershell
 # Colección: el archivo nativo toma el nombre del archivo importado.
@@ -215,11 +218,14 @@ conservan un `RUNPOST_WORKSPACE` existente y pasan sus argumentos al ejecutable:
 # -> workspace\collections\acme-gateway-scopes.collection.json (3 carpetas, 10 peticiones)
 # Entorno (se detecta solo; --kind collection|environment lo fuerza).
 .\target\release\runpost_mcp.exe import .\tests\fixtures\Acme-DESA-fake.postman_environment.json
+# OpenAPI 3, HAR, Insomnia o una carpeta de Bruno: el formato se detecta por el contenido.
+.\target\release\runpost_mcp.exe import D:\datos\mi-coleccion-bruno
 # Exportar por id, nombre o slug; --strip-secrets vacía las variables secretas.
 .\target\release\runpost_mcp.exe export acme-gateway-scopes --strip-secrets -o acme.postman_collection.json
 ```
 
-Reimportar la misma colección la sustituye y conserva los ids.
+Reimportar la misma colección la sustituye y conserva los ids. Qué se traduce de cada formato y
+qué no: [docs/IMPORT.md](docs/IMPORT.md).
 
 #### Scripts y Collection Runner
 

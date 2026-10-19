@@ -138,11 +138,11 @@ pub struct Upsert {
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]
 pub struct ImportPostman {
-    /// File path
+    /// File path, or a Bruno collection folder
     pub path: Option<String>,
-    /// Or the JSON text
+    /// Or the text (JSON or YAML)
     pub text: Option<String>,
-    /// collection | environment (auto-detected)
+    /// Postman: collection | environment (auto-detected)
     pub kind: Option<String>,
 }
 
