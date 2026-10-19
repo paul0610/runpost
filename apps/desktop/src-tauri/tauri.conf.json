@@ -39,7 +39,7 @@
     "publisher": "Paul Rojas",
     "homepage": "https://github.com/paul0610/runpost",
     "copyright": "© 2026 Paul Rojas",
-    "license": "MIT",
+    "license": "AGPL-3.0-only",
     "licenseFile": "../../../LICENSE",
     "category": "DeveloperTool",
     "shortDescription": "Local HTTP client with a built-in MCP server for AI agents",

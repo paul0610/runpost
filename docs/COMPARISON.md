@@ -12,7 +12,7 @@ resumida está en el [README](../README.md#why-runpost).
 | Secretos en el llavero del sistema | Sí, por variable | Parcial: la clave del Vault | Parcial: cifrado del sistema (safeStorage) | Parcial: la clave del vault (safeStorage) | Sí: la clave maestra |
 | Runner por línea de comandos con JUnit | Sí (`runpost_mcp run --out junit`) | Sí (Postman CLI y Newman) | Sí (`bru --reporter-junit`) | No (Inso CLI sin JUnit) | No (CLI sin JUnit) |
 | Importar Postman v2.1 | Sí | Sí | Sí | Sí | Sí |
-| Licencia y precio | MIT, gratis | Propietario, plan gratis de 1 usuario | MIT, con planes de pago | Apache-2.0, plan gratis | Código MIT; binarios gratis para uso personal, de pago para trabajo |
+| Licencia y precio | AGPL-3.0, gratis; licencia comercial para productos cerrados | Propietario, plan gratis de 1 usuario | MIT, con planes de pago | Apache-2.0, plan gratis | Código MIT; binarios gratis para uso personal, de pago para trabajo |
 | Interfaz en español | Sí | No encontrado (inglés y japonés) | No | No | No |
 
 Además, en lo comprobado, solo RunPost muestra en vivo las llamadas del agente (panel Agente con

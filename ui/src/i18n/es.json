@@ -513,7 +513,7 @@
   "about": {
     "tagline": "Cliente HTTP local con servidor MCP para agentes. Un binario, sin cuenta, sin telemetría.",
     "createdBy": "Creado por",
-    "license": "Licencia MIT. Código abierto.",
+    "license": "Licencia AGPL-3.0, código abierto. Hay licencia comercial para productos cerrados.",
     "technical": "Datos técnicos (para depurar)",
     "mode": "Modo",
     "modeTauri": "app nativa",

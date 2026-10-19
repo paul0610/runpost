@@ -10,7 +10,7 @@ El cliente HTTP que usan tú y tu agente de IA: una app de escritorio tipo Postm
 <p align="center">
   <a href="https://github.com/paul0610/runpost/actions/workflows/ci.yml"><img src="https://github.com/paul0610/runpost/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/paul0610/runpost/releases"><img src="https://img.shields.io/github/v/release/paul0610/runpost?include_prereleases&amp;sort=semver" alt="Última versión"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="Licencia MIT"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="Licencia AGPL-3.0"></a>
   <a href="docs/MCP.md"><img src="https://img.shields.io/badge/MCP-13_tools-ff6c37.svg" alt="Servidor MCP con 13 tools"></a>
   <img src="https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-lightgrey.svg" alt="Windows, macOS y Linux">
 </p>
@@ -42,7 +42,7 @@ A octubre de 2026 ([detalle y fuentes](docs/COMPARISON.md); se aceptan correccio
 | Llamadas del agente en vivo y aprobación en la app | Sí | — | — | — | — |
 | Secretos en el llavero del sistema | Por variable | Clave del vault | Cifrado del sistema | Clave del vault | Clave maestra |
 | Runner por línea de comandos con JUnit | Sí | Sí (Postman CLI, Newman) | Sí (`bru`) | No | No |
-| Licencia | MIT, gratis | Propietario, plan gratis | MIT, planes de pago | Apache-2.0, plan gratis | Código MIT, de pago para trabajo |
+| Licencia | AGPL-3.0, gratis; licencia comercial para productos cerrados | Propietario, plan gratis | MIT, planes de pago | Apache-2.0, plan gratis | Código MIT, de pago para trabajo |
 | Interfaz en español | Sí | No | No | No | No |
 
 "—": no encontrado en su documentación.
@@ -344,4 +344,10 @@ Tauri v2, incluido `webkit2gtk-4.1` y `libayatana-appindicator3`. GitHub Actions
 prueba en Windows, macOS y Linux. Los avisos transitivos de Linux y la auditoría aplicada están en
 [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
 
-MIT © 2026 Paul Rojas — creado por [Paul Rojas](https://github.com/paul0610).
+## Licencia
+
+RunPost es software libre bajo la [GNU AGPL-3.0](LICENSE). Para integrarlo en un producto o servicio
+de código cerrado hay una licencia comercial: ver [LICENSING.md](LICENSING.md). Las versiones 0.1.0
+y 0.2.0 se publicaron con licencia MIT.
+
+© 2026 Paul Rojas — creado por [Paul Rojas](https://github.com/paul0610).

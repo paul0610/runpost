@@ -10,7 +10,7 @@ The HTTP client you and your AI agent share: a Postman-like desktop app with a b
 <p align="center">
   <a href="https://github.com/paul0610/runpost/actions/workflows/ci.yml"><img src="https://github.com/paul0610/runpost/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/paul0610/runpost/releases"><img src="https://img.shields.io/github/v/release/paul0610/runpost?include_prereleases&amp;sort=semver" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
+  <a href="LICENSING.md"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="AGPL-3.0 license"></a>
   <a href="docs/MCP.md"><img src="https://img.shields.io/badge/MCP-13_tools-ff6c37.svg" alt="MCP server with 13 tools"></a>
   <img src="https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-lightgrey.svg" alt="Windows, macOS and Linux">
 </p>
@@ -41,7 +41,7 @@ As of October 2026 ([details and sources](docs/COMPARISON.md); corrections welco
 | Live view of the agent's calls, approvals in the app | Yes | — | — | — | — |
 | Secrets in the OS keychain | Per variable | Vault key | OS encryption | Vault key | Master key |
 | CLI runner with JUnit | Yes | Yes (Postman CLI, Newman) | Yes (`bru`) | No | No |
-| License | MIT, free | Proprietary, free plan | MIT, paid tiers | Apache-2.0, free plan | MIT source, paid for work |
+| License | AGPL-3.0, free; commercial license for closed products | Proprietary, free plan | MIT, paid tiers | Apache-2.0, free plan | MIT source, paid for work |
 | Spanish UI | Yes | No | No | No | No |
 
 "—": not found in their documentation.
@@ -154,4 +154,8 @@ Then run `target/release/runpost_app` (desktop) or `target/release/runpost_mcp s
 
 ## License
 
-MIT © 2026 Paul Rojas — created by [Paul Rojas](https://github.com/paul0610).
+RunPost is free software under the [GNU AGPL-3.0](LICENSE). To build it into a closed-source product
+or service, a commercial license is available: see [LICENSING.md](LICENSING.md). Versions 0.1.0 and
+0.2.0 were released under the MIT license.
+
+© 2026 Paul Rojas — created by [Paul Rojas](https://github.com/paul0610).

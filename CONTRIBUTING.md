@@ -45,4 +45,6 @@ Tests never touch the real OS keyring (`RUNPOST_KEYRING=memory` / `MemoryKeyring
 
 ## License
 
-By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).
+By contributing you agree that your contributions are licensed under the [GNU AGPL-3.0](LICENSE),
+and that Paul Rojas may also license them under other terms, including the commercial license
+described in [LICENSING.md](LICENSING.md).

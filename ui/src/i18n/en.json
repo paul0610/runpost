@@ -513,7 +513,7 @@
   "about": {
     "tagline": "Local HTTP client with an MCP server for agents. One binary, no account, no telemetry.",
     "createdBy": "Created by",
-    "license": "MIT license. Open source.",
+    "license": "AGPL-3.0 license, open source. A commercial license is available for closed products.",
     "technical": "Technical details (for debugging)",
     "mode": "Mode",
     "modeTauri": "native app",
