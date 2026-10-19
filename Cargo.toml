@@ -64,6 +64,8 @@ md-5 = { version = "=0.11.0", default-features = false }
 # Ya en el árbol por reqwest (`cookies`): las mismas versiones y features.
 cookie = "=0.18.2"
 cookie_store = "=0.22.1"
+# Ya en el árbol por serde_json_path, con las mismas features: buscar y reemplazar.
+regex = "=1.13.1"
 # Solo pruebas de TLS mutuo: los certificados se generan en la prueba (ninguna clave en el repo).
 rcgen = { version = "=0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
 rustls = { version = "=0.23.46", default-features = false, features = ["aws_lc_rs", "std"] }

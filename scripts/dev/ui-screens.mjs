@@ -452,7 +452,7 @@ async function s7() {
 }
 
 // S8 (fase 4): las pantallas nuevas, como en Postman, en claro y oscuro. Requisitos como s6; además
-// añade a la colección de ejemplo una petición con body GraphQL.
+// añade a la colección de ejemplo peticiones con OAuth 2.0 y body GraphQL, y dos ejemplos guardados.
 async function s8() {
   const summaries = await api('/collections');
   const collectionId = summaries.find((c) => c.name.startsWith('Acme')).id;
@@ -468,6 +468,26 @@ async function s8() {
   if (!collection.items.some((i) => i.name === 'GraphQL - cuenta')) {
     const query = 'query Account($id: ID!) {\n  account(id: $id) {\n    id\n    currency\n    balance\n  }\n}';
     await api(`/collections/${collectionId}/items`, { parent_id: null, item: { type: 'request', id: '', name: 'GraphQL - cuenta', method: 'POST', url: '{{apiUrl}}/graphql', body: { mode: 'graphql', query, variables: '{\n  "id": "{{accountId}}"\n}' } } }, 'POST');
+  }
+  // Ejemplos de la sonda sign: el 500 del gateway local (token con permiso) y el 401 sin token.
+  const byName = (items, name) => {
+    for (const item of items) {
+      if (item.name.startsWith(name)) return item;
+      const found = item.items && byName(item.items, name);
+      if (found) return found;
+    }
+    return null;
+  };
+  const items = (await api(`/collections/${collectionId}`)).items;
+  const probe = byName(items, '#7 POST sign (sonda');
+  if (!probe.examples?.length) {
+    const envId = (await api('/settings')).active_environment;
+    const examples = `/collections/${collectionId}/items/${probe.id}/examples`;
+    const allowed = await api('/send', { request: probe, env_id: envId }, 'POST');
+    await api(examples, { history_id: allowed.history_id, name: 'Token con permiso (error del gateway local)' }, 'POST');
+    // La misma llamada sin token es la del control negativo de la colección.
+    const anonymous = await api('/send', { request: byName(items, '#7 sign SIN token'), env_id: envId }, 'POST');
+    await api(examples, { history_id: anonymous.history_id, name: 'Sin token' }, 'POST');
   }
   for (const theme of ['light', 'dark']) {
     await setTheme(theme);
@@ -498,10 +518,16 @@ async function s8() {
       // Los avisos se van a los 4,5 s; el panel del token queda a la vista.
       await wait(5000); document.querySelector('.token').scrollIntoView({ block: 'end' }); await wait(300);`);
     await shot(`app-oauth-cc-${theme}.png`);
+    // El formulario de authorization code es largo: se baja la división petición/respuesta (↓ en el
+    // separador, como haría el usuario) y luego se devuelve.
+    const moveSplit = (key) => `const split = document.querySelector('.split');
+      for (let i = 0; i < 12; i++) split.dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', bubbles: true }));
+      await wait(300);`;
     await evaluate(`row('OAuth 2.0 - login').click(); await wait(500);
       [...document.querySelectorAll('.subtabs [role=tab]')].find(b => b.textContent.startsWith('Auth')).click(); await wait(800);
-      document.querySelector('.auth .fields').scrollIntoView({ block: 'start' }); await wait(200);`);
+      ${moveSplit('ArrowDown')}`);
     await shot(`app-oauth-code-${theme}.png`);
+    await evaluate(moveSplit('ArrowUp'));
     // Gestionar cookies: dos cookies de ejemplo (una de dominio) y una en edición.
     await api('/cookies', { domain: 'api.acme.test', cookie: 'session=fake-session-id; Path=/; HttpOnly; Secure' });
     await api('/cookies', { domain: 'acme.test', cookie: 'theme=dark; Domain=acme.test; Path=/; Max-Age=86400' });
@@ -519,6 +545,31 @@ async function s8() {
     await shot(`app-certs-${theme}.png`);
     settings.http.certificates = [];
     await api('/settings', settings);
+    // Ejemplos guardados de la sonda, con la respuesta enviada debajo y su "Guardar como ejemplo".
+    await evaluate(`key('Escape'); await wait(300); await pane(0);
+      row('#7 POST sign (sonda').click(); await wait(500);
+      [...document.querySelectorAll('.editor .subtabs [role=tab]')].find(b => b.textContent.startsWith('Ejemplos')).click(); await wait(300);
+      key('Enter', { ctrlKey: true }); await wait(2000);`);
+    await shot(`app-examples-${theme}.png`);
+    // Buscar y reemplazar en la colección: "accountId" en URLs, cuerpos y variables.
+    await evaluate(`await menuOn(row('Acme'), 'Buscar y reemplazar…');
+      const [find, replace] = document.querySelectorAll('.dialog .inputs input');
+      find.value = 'accountId'; find.dispatchEvent(new Event('input', { bubbles: true }));
+      replace.value = 'walletId'; replace.dispatchEvent(new Event('input', { bubbles: true }));
+      await wait(1000);`);
+    await shot(`app-find-${theme}.png`);
+    await evaluate(`key('Escape'); await wait(300);`);
+    // Papelera: borrar una carpeta deja un aviso con "Deshacer"; la papelera lista lo borrado.
+    await evaluate(`await menuOn(row('02 - Controles negativos'), 'Eliminar');
+      [...document.querySelectorAll('.dialog')].at(-1).querySelector('button.primary').click(); await wait(900);`);
+    await shot(`app-trash-undo-${theme}.png`);
+    const login = byName((await api(`/collections/${collectionId}`)).items, 'OAuth 2.0 - login');
+    await api(`/collections/${collectionId}/items/${login.id}`, undefined, 'DELETE');
+    await evaluate(`await wait(500); document.querySelector('.side footer button').click(); await wait(800);`);
+    await shot(`app-trash-${theme}.png`);
+    // Todo vuelve a su sitio para el otro tema.
+    for (const item of (await api('/trash')).items) await api(`/trash/${item.id}/restore`, undefined, 'POST');
+    await evaluate(`key('Escape'); await wait(300);`);
   }
 }
 

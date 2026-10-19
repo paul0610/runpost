@@ -314,6 +314,50 @@ pub struct RequestSettings {
     pub timeout_ms: Option<u64>,
 }
 
+/// Lo que se envió en un ejemplo guardado (ya sin secretos).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExampleRequest {
+    #[serde(default)]
+    pub method: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub headers: Vec<KeyValue>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub body: String,
+}
+
+/// Respuesta guardada como ejemplo de una petición (fase 4; `response` en Postman). Sale del
+/// historial, que ya está enmascarado: un ejemplo nunca lleva secretos.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Example {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub request: ExampleRequest,
+    pub status: u16,
+    #[serde(default)]
+    pub status_text: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub headers: Vec<KeyValue>,
+    #[serde(default)]
+    pub body: String,
+}
+
+impl Example {
+    pub fn new(name: impl Into<String>, status: u16) -> Self {
+        Self {
+            id: new_id("exm"),
+            name: name.into(),
+            request: ExampleRequest::default(),
+            status,
+            status_text: String::new(),
+            headers: Vec::new(),
+            body: String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
     pub id: String,
@@ -334,6 +378,9 @@ pub struct Request {
     pub settings: RequestSettings,
     #[serde(default)]
     pub description: String,
+    /// Respuestas guardadas como ejemplo.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<Example>,
 }
 
 impl Request {
@@ -350,6 +397,7 @@ impl Request {
             scripts: Scripts::default(),
             settings: RequestSettings::default(),
             description: String::new(),
+            examples: Vec::new(),
         }
     }
 }

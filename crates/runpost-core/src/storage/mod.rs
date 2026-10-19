@@ -1,8 +1,12 @@
 //! Workspace en disco (D5/D6): JSON legible por colección y entorno, historial en SQLite.
 
+mod examples;
 pub mod fs;
 pub mod history;
+mod trash;
 pub mod watcher;
+
+pub use trash::{Restored, TrashSummary};
 
 use std::{
     collections::HashMap,

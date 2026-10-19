@@ -61,7 +61,8 @@
     "soon": "Coming soon",
     "docs": "View documentation",
     "open": "Open",
-    "agent": "Agent…"
+    "agent": "Agent…",
+    "findReplace": "Find and replace…"
   },
   "tabs": {
     "new": "New tab (Ctrl+T)",
@@ -94,7 +95,8 @@
     "varDynamic": "{name}: dynamic variable, generated when sending",
     "varMissing": "{name} is not defined in the environment, the collection or the globals",
     "copied": "Id copied: {id}",
-    "docs": "Docs"
+    "docs": "Docs",
+    "examples": "Examples"
   },
   "auth": {
     "type": "Type",
@@ -259,7 +261,7 @@
     "openGlobals": "Open the global variables",
     "open": "Edit the environment variables",
     "sideHint": "● / ○ activates the environment. Click its name to edit its variables.",
-    "deleteBody": "The environment and its file in the workspace will be deleted.",
+    "deleteBody": "The environment will go to the trash (30 days). You can undo it.",
     "moveAllTitle": "Take the secret values out of the environment file and store them in the system keyring",
     "moveOneTitle": "Take the value out of the environment file and store it in the system keyring (Credential Manager, Keychain or Secret Service)",
     "inKeyringTitle": "In the system keyring: the environment file does not store the value",
@@ -409,9 +411,9 @@
     "newEnvironment": "New environment",
     "renameTitle": "Rename \"{name}\"",
     "deleteTitle": "Delete \"{name}\"?",
-    "deleteCollection": "The collection and its workspace file will be deleted.",
-    "deleteFolder": "The folder and everything inside it will be deleted.",
-    "deleteRequest": "The request will be removed from the collection.",
+    "deleteCollection": "The collection will go to the trash (30 days). You can undo it.",
+    "deleteFolder": "The folder and everything inside it will go to the trash (30 days). You can undo it.",
+    "deleteRequest": "The request will go to the trash (30 days). You can undo it.",
     "unsavedTitle": "Unsaved changes",
     "unsavedBody": "\"{name}\" has unsaved changes. Save them before closing?",
     "saveAsTitle": "Save request",
@@ -559,5 +561,77 @@
     "choose": "Choose…",
     "add": "Add certificate",
     "remove": "Remove certificate"
+  },
+  "trash": {
+    "moved": "\"{name}\" moved to the trash",
+    "undo": "Undo",
+    "restored": "Restored from the trash",
+    "open": "Trash",
+    "openTitle": "What you deleted in the last 30 days",
+    "title": "Trash",
+    "close": "Close",
+    "hint": "Deleted items stay here for 30 days. Restore puts them back where they were; Delete forever cannot be undone.",
+    "nothing": "The trash is empty.",
+    "kind": {
+      "collection": "Collection",
+      "folder": "Folder",
+      "request": "Request",
+      "environment": "Environment"
+    },
+    "requests": "{count} requests",
+    "restore": "Restore",
+    "purge": "Delete forever",
+    "purgeTitle": "Delete \"{name}\" forever?",
+    "purgeBody": "This cannot be undone. For an environment, its secrets are also removed from the system keyring.",
+    "empty": "Empty trash",
+    "emptyTitle": "Empty the trash?",
+    "emptyBody": "Everything in the trash will be deleted forever. This cannot be undone."
+  },
+  "examples": {
+    "save": "Save as example",
+    "saveTitle": "Save this response (already masked) as an example of the request",
+    "saveFirst": "Save the request to keep examples for it",
+    "nameTitle": "Example name",
+    "saveConfirm": "Save",
+    "saved": "Example \"{name}\" saved",
+    "unsaved": "Save the request to keep examples for it.",
+    "empty": "No examples yet. Send the request and click \"Save as example\" in the response.",
+    "rename": "Rename",
+    "renameTitle": "Rename \"{name}\"",
+    "delete": "Delete",
+    "deleteTitle": "Delete the example \"{name}\"?",
+    "deleteBody": "The example will be removed from the request.",
+    "noBody": "Response without a body."
+  },
+  "find": {
+    "title": "Find and replace",
+    "close": "Close",
+    "find": "Find",
+    "with": "Replace with",
+    "caseSensitive": "Match case",
+    "wholeWord": "Whole word",
+    "regex": "Regular expression",
+    "count": "{count} matches in {fields} fields",
+    "none": "No matches.",
+    "replacePicked": "Replace selected",
+    "replaceAll": "Replace all",
+    "replace": "Replace",
+    "confirmTitle": "Replace {count} matches?",
+    "confirmBody": "The changes are saved to the collection. Credentials are replaced too, even though they show as *** here.",
+    "replaced": "{count} replacements made",
+    "field": {
+      "name": "Name",
+      "url": "URL",
+      "params": "Params",
+      "headers": "Headers",
+      "body": "Body",
+      "auth": "Auth",
+      "scripts": {
+        "pre": "Pre-request",
+        "test": "Tests"
+      },
+      "description": "Description",
+      "variables": "Variables"
+    }
   }
 }

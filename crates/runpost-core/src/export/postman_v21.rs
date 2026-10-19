@@ -234,6 +234,35 @@ fn request(request: &Request) -> Value {
     if let Some(events) = events(&request.scripts) {
         item.insert("event".into(), events);
     }
+    if !request.examples.is_empty() {
+        item.insert(
+            "response".into(),
+            request
+                .examples
+                .iter()
+                .map(|example| {
+                    let mut original = json!({
+                        "method": example.request.method,
+                        "header": key_values(&example.request.headers),
+                        "url": {"raw": example.request.url},
+                    });
+                    if !example.request.body.is_empty() {
+                        original["body"] = json!({"mode": "raw", "raw": example.request.body});
+                    }
+                    json!({
+                        "id": postman_id(&example.id),
+                        "name": example.name,
+                        "originalRequest": original,
+                        "status": example.status_text,
+                        "code": example.status,
+                        "header": key_values(&example.headers),
+                        "cookie": [],
+                        "body": example.body,
+                    })
+                })
+                .collect(),
+        );
+    }
     let mut behavior = Map::new();
     if let Some(follow) = request.settings.follow_redirects {
         behavior.insert("followRedirects".into(), json!(follow));
@@ -556,5 +585,34 @@ mod tests {
             back.warnings
         );
         assert!(back.warnings[1].contains("grant \"implicit\" not supported"));
+    }
+
+    #[test]
+    fn examples_round_trip_through_postman() {
+        let mut c = Collection::new("Examples");
+        let mut request = Request::new("ping", "GET", "https://api.example.test/v1/ping");
+        let mut example = crate::model::Example::new("Pong", 200);
+        example.status_text = "OK".into();
+        example.headers = vec![KeyValue::new("Content-Type", "application/json")];
+        example.body = "{\"pong\":true}".into();
+        example.request = crate::model::ExampleRequest {
+            method: "GET".into(),
+            url: "https://api.example.test/v1/ping".into(),
+            headers: vec![KeyValue::new("Accept", "application/json")],
+            body: String::new(),
+        };
+        request.examples.push(example);
+        c.items.push(Item::Request(Box::new(request)));
+        let exported = export_collection(&c, false);
+        let response = &exported["item"][0]["response"][0];
+        assert_eq!(response["name"], "Pong");
+        assert_eq!(response["code"], 200);
+        assert_eq!(response["status"], "OK");
+        assert_eq!(
+            response["originalRequest"]["url"]["raw"],
+            "https://api.example.test/v1/ping"
+        );
+        let back = import_collection_value(&exported).unwrap();
+        assert_eq!(back.collection, c);
     }
 }

@@ -20,6 +20,7 @@ use runpost_core::{
     import::Format,
     import::postman_v21::PostmanKind,
     model::{Collection, Environment, Globals, Item, Position, Request as SavedRequest, Settings},
+    search::{self, FindOptions},
     storage::{HistoryEntry, fs::write_atomic},
     vars::Vars,
 };
@@ -154,6 +155,19 @@ pub(crate) fn routes() -> Router<AppState> {
         )
         .route("/collections/{id}/items/{item}/move", post(move_item))
         .route(
+            "/collections/{id}/items/{item}/examples",
+            post(save_example),
+        )
+        .route(
+            "/collections/{id}/items/{item}/examples/{example}",
+            axum::routing::patch(rename_example).delete(delete_example),
+        )
+        .route("/collections/{id}/find", post(find_in_collection))
+        .route("/collections/{id}/replace", post(replace_in_collection))
+        .route("/trash", get(list_trash).delete(empty_trash))
+        .route("/trash/{id}", axum::routing::delete(purge_trash))
+        .route("/trash/{id}/restore", post(restore_trash))
+        .route(
             "/collections/{id}/items/{item}/duplicate",
             post(duplicate_item),
         )
@@ -254,9 +268,9 @@ async fn put_collection(
     ok(collection)
 }
 
+/// Borrar deja la colección en la papelera; la respuesta trae la entrada para "Deshacer".
 async fn delete_collection(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
-    state.workspace.delete_collection(&id)?;
-    no_content()
+    ok(json!({"trash": state.workspace.trash_collection(&id)?}))
 }
 
 // ---- árbol ----
@@ -320,16 +334,132 @@ async fn patch_item(
     ok(updated)
 }
 
+/// Borrar deja la carpeta o petición en la papelera, con su sitio.
 async fn delete_item(
     State(state): State<AppState>,
     Path((id, item_id)): Path<(String, String)>,
 ) -> ApiResult {
-    let mut collection = state.workspace.load_collection(&id)?;
-    collection
-        .remove_item(&item_id)
-        .ok_or_else(|| CoreError::not_found("item", &item_id))?;
-    state.workspace.save_collection(&collection)?;
+    ok(json!({"trash": state.workspace.trash_item(&id, &item_id)?}))
+}
+
+// ---- ejemplos guardados ----
+
+#[derive(Deserialize)]
+struct SaveExample {
+    /// Ejecución del historial (ya enmascarada) cuya respuesta se guarda.
+    history_id: String,
+    name: Option<String>,
+}
+
+async fn save_example(
+    State(state): State<AppState>,
+    Path((id, item_id)): Path<(String, String)>,
+    Body(body): Body<SaveExample>,
+) -> ApiResult {
+    let example =
+        state
+            .workspace
+            .save_example(&id, &item_id, &body.history_id, body.name.as_deref())?;
+    ok(json!({"example": example}))
+}
+
+#[derive(Deserialize)]
+struct RenameExample {
+    name: String,
+}
+
+async fn rename_example(
+    State(state): State<AppState>,
+    Path((id, item_id, example_id)): Path<(String, String, String)>,
+    Body(body): Body<RenameExample>,
+) -> ApiResult {
+    state
+        .workspace
+        .rename_example(&id, &item_id, &example_id, &body.name)?;
     no_content()
+}
+
+async fn delete_example(
+    State(state): State<AppState>,
+    Path((id, item_id, example_id)): Path<(String, String, String)>,
+) -> ApiResult {
+    state.workspace.delete_example(&id, &item_id, &example_id)?;
+    no_content()
+}
+
+// ---- buscar y reemplazar ----
+
+#[derive(Deserialize)]
+struct FindBody {
+    query: String,
+    #[serde(flatten)]
+    options: FindOptions,
+}
+
+async fn find_in_collection(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Body(body): Body<FindBody>,
+) -> ApiResult {
+    let collection = state.workspace.load_collection(&id)?;
+    ok(json!({"matches": search::find(&collection, &body.query, &body.options)?}))
+}
+
+#[derive(Deserialize)]
+struct ReplaceTarget {
+    #[serde(default)]
+    item_id: String,
+    field: String,
+}
+
+#[derive(Deserialize)]
+struct ReplaceBody {
+    query: String,
+    replacement: String,
+    #[serde(flatten)]
+    options: FindOptions,
+    /// Solo estos campos; sin ellos, en toda la colección.
+    targets: Option<Vec<ReplaceTarget>>,
+}
+
+async fn replace_in_collection(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Body(body): Body<ReplaceBody>,
+) -> ApiResult {
+    let mut collection = state.workspace.load_collection(&id)?;
+    let targets: Option<Vec<(String, String)>> = body
+        .targets
+        .map(|targets| targets.into_iter().map(|t| (t.item_id, t.field)).collect());
+    let replaced = search::replace(
+        &mut collection,
+        &body.query,
+        &body.replacement,
+        &body.options,
+        targets.as_deref(),
+    )?;
+    if replaced > 0 {
+        state.workspace.save_collection(&collection)?;
+    }
+    ok(json!({"replaced": replaced, "collection": collection}))
+}
+
+// ---- papelera ----
+
+async fn list_trash(State(state): State<AppState>) -> ApiResult {
+    ok(json!({"items": state.workspace.trash()?}))
+}
+
+async fn restore_trash(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
+    ok(state.workspace.restore(&id)?)
+}
+
+async fn purge_trash(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
+    ok(json!({"purged": state.workspace.purge(Some(&id))?}))
+}
+
+async fn empty_trash(State(state): State<AppState>) -> ApiResult {
+    ok(json!({"purged": state.workspace.purge(None)?}))
 }
 
 #[derive(Deserialize, Default)]
@@ -428,10 +558,10 @@ async fn put_environment(
     ok(env)
 }
 
+/// Borrar deja el entorno en la papelera (sus secretos siguen en el llavero hasta vaciarla).
 async fn delete_environment(State(state): State<AppState>, Path(id): Path<String>) -> ApiResult {
     let env = state.workspace.find_environment(&id)?;
-    state.workspace.delete_environment(&env.id)?;
-    no_content()
+    ok(json!({"trash": state.workspace.trash_environment(&env.id)?}))
 }
 
 async fn get_globals(State(state): State<AppState>) -> ApiResult {

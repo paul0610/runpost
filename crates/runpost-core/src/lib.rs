@@ -15,6 +15,7 @@ pub mod model;
 pub mod policy;
 pub mod runner;
 pub mod script;
+pub mod search;
 pub mod secrets;
 pub mod storage;
 pub mod vars;

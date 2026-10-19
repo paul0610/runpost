@@ -133,6 +133,10 @@ de otras plataformas. No se borraron dependencias para ocultar hallazgos.
   `bit-vec` 0.9.1 a las pruebas. El lock anota además las opcionales de `rcgen` (`x509-parser` y su
   familia ASN.1), que no se compilan (`cargo tree -i x509-parser` no muestra nada).
 
-Consulta del 2026-10-18 en crates.io y OSV: todas las versiones superan los siete días y no tienen
-avisos. SHA-256 y SHA-512-256 (digest, PKCE de OAuth 2.0 y los ids estables de las importaciones)
+- `regex` 1.13.1 (2026-07-15) pasa a dependencia directa para "Buscar y reemplazar". Ya estaba en
+  el árbol (`serde_json_path`, `tauri-utils`): `Cargo.lock` solo anota la arista nueva. Garantiza
+  tiempo lineal (sin retroceso catastrófico) y el patrón compilado se limita a 1 MB.
+
+Consulta del 2026-10-18 en crates.io y OSV (`regex`, el 2026-10-19): todas las versiones superan
+los siete días y no tienen avisos. SHA-256 y SHA-512-256 (digest, PKCE de OAuth 2.0 y los ids estables de las importaciones)
 usan `aws-lc-rs`, que ya estaba.

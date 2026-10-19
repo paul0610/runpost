@@ -86,6 +86,12 @@
   const activeEnvId = $derived(store.activeEnvironment?.id ?? null);
 </script>
 
+{#snippet trashButton()}
+  <footer>
+    <button class="ghost foot" title={t('trash.openTitle')} onclick={() => (store.ui.trashOpen = true)}>🗑 {t('trash.open')}</button>
+  </footer>
+{/snippet}
+
 <aside class="side">
   {#if store.ui.pane === 'collections'}
     <header>
@@ -131,6 +137,7 @@
         <p class="hint">{t('side.noCollections')}</p>
       {/each}
     </div>
+    {@render trashButton()}
   {:else if store.ui.pane === 'environments'}
     <header>
       {t('rail.environments')}
@@ -159,6 +166,7 @@
       {/each}
       <p class="hint">{t('env.sideHint')}</p>
     </div>
+    {@render trashButton()}
   {:else if store.ui.pane === 'history'}
     <header>
       {t('rail.history')}
@@ -213,4 +221,7 @@
   .code-ok { color: var(--ok); }
   .code-info { color: var(--info); }
   .code-err { color: var(--err); }
+  footer { flex: none; border-top: 1px solid var(--border); padding: 4px 6px; }
+  .foot { font-size: 12px; color: var(--muted); padding: 3px 8px; }
+  .foot:hover { color: var(--fg); }
 </style>

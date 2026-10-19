@@ -1,10 +1,11 @@
 <script lang="ts">
-  // Constructor de petición (P1): [Método ▾] [URL] [Enviar] [Guardar] [⋯] y Params · Auth · Headers · Body · Scripts · Ajustes.
+  // Constructor de petición (P1): [Método ▾] [URL] [Enviar] [Guardar] [⋯] y Params · Auth · Headers · Body · Scripts · Ajustes
+  // · Docs · Ejemplos.
   import { onMount } from 'svelte';
   import { store, type RequestTab, type SubTab } from '../stores/app.svelte';
   import { t } from '../i18n.svelte';
   import { COMMON_HEADERS, MEDIA_TYPES } from '../kv';
-  import { inheritedAuth } from '../stores/requests';
+  import { findRequest, inheritedAuth } from '../stores/requests';
   import { isEnabled } from '../url';
   import UrlInput from './UrlInput.svelte';
   import KeyValueTable from './KeyValueTable.svelte';
@@ -12,6 +13,7 @@
   import BodyEditor from './BodyEditor.svelte';
   import CodeEditor from './CodeEditor.svelte';
   import MarkdownBlock from './MarkdownBlock.svelte';
+  import ExamplesPane from './ExamplesPane.svelte';
 
   let { tab }: { tab: RequestTab } = $props();
 
@@ -22,6 +24,12 @@
   let urlInput = $state<UrlInput>();
   let scriptTab = $state<'pre' | 'test'>('pre');
   let docsEditing = $state(false);
+
+  // Los ejemplos se guardan aparte del borrador (desde la respuesta): se cuentan en la colección.
+  const exampleCount = $derived.by(() => {
+    const collection = store.collection(tab.collectionId);
+    return (collection && tab.requestId ? findRequest(collection, tab.requestId)?.examples?.length : 0) ?? 0;
+  });
 
   const count = (rows: { key: string; enabled?: boolean }[] | undefined) =>
     (rows ?? []).filter((r) => isEnabled(r) && r.key.trim() !== '').length;
@@ -53,6 +61,7 @@
     { id: 'scripts', label: 'req.scripts', badge: () => (draft.scripts.pre || draft.scripts.test ? '●' : '') },
     { id: 'settings', label: 'req.settings', badge: () => '' },
     { id: 'docs', label: 'req.docs', badge: () => (draft.description.trim() ? '●' : '') },
+    { id: 'examples', label: 'req.examples', badge: () => (exampleCount ? String(exampleCount) : '') },
   ];
 
   function moreMenu(event: MouseEvent): void {
@@ -205,6 +214,8 @@
           <MarkdownBlock source={draft.description} empty={t('docs.empty')} />
         {/if}
       </div>
+    {:else if tab.subtab === 'examples'}
+      <ExamplesPane {tab} />
     {/if}
   </div>
 </div>

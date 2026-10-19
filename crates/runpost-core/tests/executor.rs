@@ -202,6 +202,43 @@ async fn adhoc_with_collection_inherits_auth_and_variables() -> anyhow::Result<(
 }
 
 #[tokio::test]
+async fn graphql_body_goes_as_json_with_its_variables_resolved() -> anyhow::Result<()> {
+    let query = "query Account($id: ID!) { account(id: $id) { id } }";
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/graphql"))
+        .and(header("content-type", "application/json"))
+        .and(body_json(
+            json!({"query": query, "variables": {"id": "collection"}}),
+        ))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({"data": {"account": {"id": "x"}}})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let (_dir, ws) = workspace();
+    let (collection, _) = setup(&ws, &server.uri());
+    let draft = RequestDraft {
+        method: "POST".into(),
+        url: "{{base}}/graphql".into(),
+        auth: Auth::None,
+        body: Body::Graphql {
+            query: query.into(),
+            variables: r#"{"id": "{{who}}"}"#.into(),
+        },
+        collection_id: Some(collection.id.clone()),
+        ..RequestDraft::default()
+    };
+    let result = Executor::new()
+        .send_adhoc(&ws, draft, RunContext::new(Source::Ui))
+        .await?;
+    server.verify().await;
+    assert_eq!(result.response.status, 200);
+    Ok(())
+}
+
+#[tokio::test]
 async fn network_error_is_short_masked_and_recorded() -> anyhow::Result<()> {
     // Puerto cerrado: se obtiene uno libre y se suelta antes de usarlo.
     let port = std::net::TcpListener::bind("127.0.0.1:0")?

@@ -42,7 +42,8 @@
   }
 
   function key(event: KeyboardEvent): void {
-    if (event.key === 'Escape') close();
+    // Con un diálogo de confirmación encima, Escape solo cierra ese.
+    if (event.key === 'Escape' && !event.defaultPrevented && !store.dialog) close();
   }
 
   function edit(cookie: CookieInfo): void {

@@ -5,9 +5,9 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::model::{
-    ApiKeyIn, Auth, Body, ClientAuth, Collection, Environment, FieldKind, Folder, Item, KeyValue,
-    MultipartField, OAuth2Cc, OAuth2Code, RawLang, Request, RequestSettings, SCHEMA, Scripts,
-    Variable, new_id,
+    ApiKeyIn, Auth, Body, ClientAuth, Collection, Environment, Example, ExampleRequest, FieldKind,
+    Folder, Item, KeyValue, MultipartField, OAuth2Cc, OAuth2Code, RawLang, Request,
+    RequestSettings, SCHEMA, Scripts, Variable, new_id,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -358,6 +358,45 @@ fn body(value: Option<&Value>) -> Body {
     }
 }
 
+/// `response` de Postman (ejemplos guardados) → `examples`.
+fn examples(list: Option<&Value>) -> Vec<Example> {
+    array(list)
+        .iter()
+        .filter(|response| response.is_object())
+        .map(|response| {
+            let code = response
+                .get("code")
+                .and_then(Value::as_u64)
+                .map_or(0, |code| u16::try_from(code).unwrap_or(0));
+            let name = text(response.get("name"));
+            let mut example = Example::new(
+                if name.is_empty() {
+                    "Example".into()
+                } else {
+                    name
+                },
+                code,
+            );
+            example.id = id_from("exm", response.get("id"));
+            example.status_text = text(response.get("status"));
+            example.headers = key_values(response.get("header"));
+            example.body = text(response.get("body"));
+            if let Some(original) = response.get("originalRequest").filter(|o| o.is_object()) {
+                example.request = ExampleRequest {
+                    method: text(original.get("method")).to_uppercase(),
+                    url: match original.get("url") {
+                        Some(Value::Object(url)) => text(url.get("raw")),
+                        other => text(other),
+                    },
+                    headers: key_values(original.get("header")),
+                    body: text(original.pointer("/body/raw")),
+                };
+            }
+            example
+        })
+        .collect()
+}
+
 fn request(item: &Value, at: &str, warnings: &mut Vec<String>) -> Request {
     let name = text(item.get("name"));
     // `request` puede ser solo la URL en texto.
@@ -368,11 +407,6 @@ fn request(item: &Value, at: &str, warnings: &mut Vec<String>) -> Request {
     };
     let (url, params) = url(req.get("url"), at, warnings);
     let behavior = item.get("protocolProfileBehavior");
-    if !array(item.get("response")).is_empty() {
-        warnings.push(format!(
-            "{at}: saved response examples are not imported (phase 4)"
-        ));
-    }
     Request {
         id: id_from("req", item.get("id")),
         name,
@@ -397,6 +431,7 @@ fn request(item: &Value, at: &str, warnings: &mut Vec<String>) -> Request {
             timeout_ms: None,
         },
         description: description(req.get("description")),
+        examples: examples(item.get("response")),
     }
 }
 
@@ -502,7 +537,10 @@ mod tests {
                   "auth": {"type": "apikey", "apikey": [{"key":"key","value":"K"},{"key":"value","value":"V"},{"key":"in","value":"query"}]},
                   "body": {"mode": "urlencoded", "urlencoded": [{"key": "a", "value": "1"}]}},
                 "protocolProfileBehavior": {"followRedirects": false, "strictSSL": false},
-                "response": [{"name": "example"}]},
+                "response": [{"name": "example", "code": 200, "status": "OK",
+                  "header": [{"key": "Content-Type", "value": "application/json"}],
+                  "body": "{\"ok\":true}",
+                  "originalRequest": {"method": "get", "url": {"raw": "{{base}}/q?x=1"}, "header": []}}]},
                {"name": "form", "request": {"method": "POST", "url": "{{base}}/f",
                   "body": {"mode": "formdata", "formdata": [{"key": "t", "value": "v", "type": "text"},
                                                             {"key": "f", "type": "file", "src": ["C:/a.bin"]}]}}},
@@ -613,7 +651,26 @@ mod tests {
             ("GET", "http://short")
         );
         assert_eq!(reqs[6].url, "https://api.x.com/v1/u");
-        assert_eq!(warnings.len(), 3, "{warnings:?}");
+        assert_eq!(warnings.len(), 2, "{warnings:?}");
+        // Los ejemplos (`response`) se importan.
+        let example = &reqs[0].examples[0];
+        assert_eq!(
+            (
+                example.name.as_str(),
+                example.status,
+                example.status_text.as_str()
+            ),
+            ("example", 200, "OK")
+        );
+        assert_eq!(example.body, "{\"ok\":true}");
+        assert_eq!(example.headers[0].key, "Content-Type");
+        assert_eq!(
+            (
+                example.request.method.as_str(),
+                example.request.url.as_str()
+            ),
+            ("GET", "{{base}}/q?x=1")
+        );
     }
 
     #[test]

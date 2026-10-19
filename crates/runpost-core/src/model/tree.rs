@@ -128,6 +128,24 @@ impl Collection {
         remove(&mut self.items, id)
     }
 
+    /// Carpeta padre (`None` = raíz) y posición del elemento `id` entre sus hermanos.
+    pub fn locate(&self, id: &str) -> Option<(Option<String>, usize)> {
+        fn walk(items: &[Item], id: &str, parent: Option<&str>) -> Option<(Option<String>, usize)> {
+            for (index, item) in items.iter().enumerate() {
+                if item.id() == id {
+                    return Some((parent.map(str::to_owned), index));
+                }
+                if let Item::Folder(folder) = item
+                    && let Some(found) = walk(&folder.items, id, Some(&folder.id))
+                {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        walk(&self.items, id, None)
+    }
+
     /// Mueve un elemento dentro de la colección. No permite meter una carpeta en sí misma.
     pub fn move_item(&mut self, id: &str, position: &Position) -> Result<(), CoreError> {
         let item = self

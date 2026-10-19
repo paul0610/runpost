@@ -4325,6 +4325,7 @@ dependencies = [
  "md-5",
  "notify",
  "rcgen",
+ "regex",
  "reqwest",
  "rquickjs",
  "rusqlite",

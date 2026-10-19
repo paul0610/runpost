@@ -1,6 +1,6 @@
 <script lang="ts">
   // Visor de respuesta (P1): estado · ms · tamaño, Body (Pretty/Raw/Preview), Headers, Cookies, Tests;
-  // buscar, copiar y guardar a archivo.
+  // buscar, copiar, guardar a archivo y guardar como ejemplo de la petición.
   import { store, type BodyView, type RequestTab, type RespTab } from '../stores/app.svelte';
   import { locale, t } from '../i18n.svelte';
   import { extensionFor, formatBytes, prettyBody, statusClass } from '../format';
@@ -59,6 +59,17 @@
     }
   }
 
+  // Solo una petición guardada puede tener ejemplos; la respuesta sale del historial (ya enmascarada).
+  const canSaveExample = $derived(!!(tab.requestId && tab.collectionId && result?.history_id));
+
+  async function saveExample(): Promise<void> {
+    if (!response || !result || !tab.requestId || !tab.collectionId) return;
+    const name = await store.askPrompt(t('examples.nameTitle'), `${response.status} ${response.status_text}`.trim(), t('examples.saveConfirm'));
+    if (name === null) return;
+    const saved = await store.saveExample(tab.collectionId, tab.requestId, result.history_id, name.trim() || undefined);
+    if (saved) tab.subtab = 'examples';
+  }
+
   const errorTitle = (code: string) => {
     const key = `errors.${code}`;
     const text = t(key);
@@ -114,17 +125,20 @@
           </button>
         {/each}
       </div>
-      {#if tab.respTab === 'body'}
-        <div class="tools">
+      <div class="tools">
+        {#if tab.respTab === 'body'}
           {#each views as view (view)}
             <button class="pill-btn" class:on={tab.bodyView === view} onclick={() => (tab.bodyView = view)}>{t(`res.${view}`)}</button>
           {/each}
           <button class="icon ghost" title={t('res.search')} aria-label={t('res.search')} disabled={tab.bodyView === 'preview' || binary} onclick={() => editor?.openSearch()}>🔍</button>
           <button class="icon ghost" title={t('res.copy')} aria-label={t('res.copy')} onclick={copyBody}>⧉</button>
           <button class="icon ghost" title={t('res.save')} aria-label={t('res.save')} onclick={saveBody}>💾</button>
-          <button class="ghost small" disabled title={t('res.snapshotSoon')}>{t('res.snapshot')}</button>
-        </div>
-      {/if}
+        {/if}
+        <button class="ghost small" disabled={!canSaveExample} title={canSaveExample ? t('examples.saveTitle') : t('examples.saveFirst')} onclick={saveExample}>
+          {t('examples.save')}
+        </button>
+        {#if tab.respTab === 'body'}<button class="ghost small" disabled title={t('res.snapshotSoon')}>{t('res.snapshot')}</button>{/if}
+      </div>
     </div>
 
     <div class="content">

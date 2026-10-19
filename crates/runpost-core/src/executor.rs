@@ -128,6 +128,7 @@ impl RequestDraft {
             scripts: self.scripts,
             settings: self.settings,
             description: String::new(),
+            examples: Vec::new(),
         }
     }
 }

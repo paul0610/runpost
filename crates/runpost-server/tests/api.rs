@@ -176,14 +176,36 @@ async fn collections_and_tree_operations() {
         "copia"
     );
 
-    let (status, _) = api
-        .call(
+    // Borrar deja la petición en la papelera y "Deshacer" la devuelve a su sitio.
+    let deleted = api
+        .ok(
             Method::DELETE,
             &format!("/collections/{id}/items/{request_id}"),
             None,
         )
         .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(deleted["trash"]["kind"], "request");
+    let trash_id = deleted["trash"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        api.ok(Method::GET, "/trash", None).await["items"][0]["id"],
+        trash_id.as_str()
+    );
+    let restored = api
+        .ok(Method::POST, &format!("/trash/{trash_id}/restore"), None)
+        .await;
+    assert_eq!(restored["id"], request_id.as_str());
+    assert_eq!(restored["collection_id"], id.as_str());
+    api.ok(
+        Method::DELETE,
+        &format!("/collections/{id}/items/{request_id}"),
+        None,
+    )
+    .await;
+    assert_eq!(api.ok(Method::DELETE, "/trash", None).await["purged"], 1);
+    let (status, _) = api
+        .call(Method::POST, &format!("/trash/{trash_id}/restore"), None)
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, missing) = api
         .call(
             Method::DELETE,
@@ -215,10 +237,10 @@ async fn collections_and_tree_operations() {
     assert_ne!(dup["id"], json!(id));
     assert_ne!(dup["items"][0]["id"], json!(folder_id));
 
-    let (status, _) = api
-        .call(Method::DELETE, &format!("/collections/{id}"), None)
+    let deleted = api
+        .ok(Method::DELETE, &format!("/collections/{id}"), None)
         .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(deleted["trash"]["kind"], "collection");
     let (status, error) = api
         .call(Method::GET, &format!("/collections/{id}"), None)
         .await;
@@ -270,10 +292,10 @@ async fn settings_environments_globals() {
             .len(),
         1
     );
-    let (status, _) = api
-        .call(Method::DELETE, &format!("/environments/{env_id}"), None)
+    let deleted = api
+        .ok(Method::DELETE, &format!("/environments/{env_id}"), None)
         .await;
-    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(deleted["trash"]["kind"], "environment");
 
     let globals = api
         .ok(
@@ -1237,5 +1259,164 @@ async fn cookie_manager() {
     let cleared = api.ok(Method::DELETE, "/cookies", None).await;
     assert_eq!(cleared["removed"], 1);
     assert!(cleared["cookies"].as_array().unwrap().is_empty());
+    api.server.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn examples_and_find_replace() {
+    let api = Api::start().await;
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/ping"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("content-type", "application/json")
+                .set_body_json(json!({"pong": true})),
+        )
+        .mount(&server)
+        .await;
+    let collection = api
+        .ok(Method::POST, "/collections", Some(json!({"name": "Acme"})))
+        .await;
+    let id = collection["id"].as_str().unwrap().to_owned();
+    let request = api
+        .ok(
+            Method::POST,
+            &format!("/collections/{id}/items"),
+            Some(
+                json!({"item": {"type": "request", "id": "", "name": "ping v1", "method": "GET",
+                "url": format!("{}/v1/ping", server.uri()),
+                "headers": [{"key": "X-Version", "value": "v1"}]}}),
+            ),
+        )
+        .await;
+    let request_id = request["id"].as_str().unwrap().to_owned();
+
+    // Guardar como ejemplo la respuesta de una ejecución (sale del historial).
+    let sent = api
+        .ok(
+            Method::POST,
+            "/send",
+            Some(json!({"request": {"request_id": request_id}})),
+        )
+        .await;
+    let history_id = sent["history_id"].as_str().unwrap().to_owned();
+    let saved = api
+        .ok(
+            Method::POST,
+            &format!("/collections/{id}/items/{request_id}/examples"),
+            Some(json!({"history_id": history_id})),
+        )
+        .await;
+    let example = &saved["example"];
+    assert_eq!(example["name"], "200 OK");
+    assert_eq!(example["status"], 200);
+    assert!(example["body"].as_str().unwrap().contains("pong"));
+    assert_eq!(example["request"]["method"], "GET");
+    let example_id = example["id"].as_str().unwrap().to_owned();
+    let (status, _) = api
+        .call(
+            Method::PATCH,
+            &format!("/collections/{id}/items/{request_id}/examples/{example_id}"),
+            Some(json!({"name": "Pong"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let stored = api
+        .ok(Method::GET, &format!("/collections/{id}"), None)
+        .await;
+    assert_eq!(stored["items"][0]["examples"][0]["name"], "Pong");
+    let (status, _) = api
+        .call(
+            Method::POST,
+            &format!("/collections/{id}/items/{request_id}/examples"),
+            Some(json!({"history_id": "h_missing"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    // La petición tiene que estar en la colección de la ruta.
+    let other = api
+        .ok(Method::POST, "/collections", Some(json!({"name": "Otra"})))
+        .await;
+    let (status, _) = api
+        .call(
+            Method::POST,
+            &format!(
+                "/collections/{}/items/{request_id}/examples",
+                other["id"].as_str().unwrap()
+            ),
+            Some(json!({"history_id": history_id})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    // Un segundo ejemplo con nombre, y se borra.
+    let second = api
+        .ok(
+            Method::POST,
+            &format!("/collections/{id}/items/{request_id}/examples"),
+            Some(json!({"history_id": history_id, "name": "Otra vez"})),
+        )
+        .await;
+    assert_eq!(second["example"]["name"], "Otra vez");
+    let (status, _) = api
+        .call(
+            Method::DELETE,
+            &format!(
+                "/collections/{id}/items/{request_id}/examples/{}",
+                second["example"]["id"].as_str().unwrap()
+            ),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let stored = api
+        .ok(Method::GET, &format!("/collections/{id}"), None)
+        .await;
+    assert_eq!(stored["items"][0]["examples"].as_array().unwrap().len(), 1);
+
+    // Buscar y reemplazar: solo en las cabeceras de esa petición.
+    let found = api
+        .ok(
+            Method::POST,
+            &format!("/collections/{id}/find"),
+            Some(json!({"query": "V1"})),
+        )
+        .await;
+    let fields: Vec<&str> = found["matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["field"].as_str().unwrap())
+        .collect();
+    assert_eq!(fields, ["name", "url", "headers"]);
+    let replaced = api
+        .ok(
+            Method::POST,
+            &format!("/collections/{id}/replace"),
+            Some(json!({"query": "v1", "replacement": "v2",
+                        "targets": [{"item_id": request_id, "field": "headers"}]})),
+        )
+        .await;
+    assert_eq!(replaced["replaced"], 1);
+    let item = &replaced["collection"]["items"][0];
+    assert_eq!(item["headers"][0]["value"], "v2");
+    assert!(item["url"].as_str().unwrap().ends_with("/v1/ping"));
+    let (status, bad) = api
+        .call(
+            Method::POST,
+            &format!("/collections/{id}/find"),
+            Some(json!({"query": "(", "regex": true})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{bad}");
+
+    let (status, _) = api
+        .call(
+            Method::DELETE,
+            &format!("/collections/{id}/items/{request_id}/examples/{example_id}"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
     api.server.shutdown().await.unwrap();
 }

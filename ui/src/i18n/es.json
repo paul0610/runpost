@@ -61,7 +61,8 @@
     "soon": "Próximamente",
     "docs": "Ver documentación",
     "open": "Abrir",
-    "agent": "Agente…"
+    "agent": "Agente…",
+    "findReplace": "Buscar y reemplazar…"
   },
   "tabs": {
     "new": "Nueva pestaña (Ctrl+T)",
@@ -94,7 +95,8 @@
     "varDynamic": "{name}: variable dinámica, se genera al enviar",
     "varMissing": "{name} no existe en el entorno, la colección ni las globales",
     "copied": "Id copiado: {id}",
-    "docs": "Docs"
+    "docs": "Docs",
+    "examples": "Ejemplos"
   },
   "auth": {
     "type": "Tipo",
@@ -259,7 +261,7 @@
     "openGlobals": "Abrir las variables globales",
     "open": "Editar las variables del entorno",
     "sideHint": "● / ○ activa el entorno. Pulsa su nombre para editar las variables.",
-    "deleteBody": "Se borrará el entorno y su archivo del workspace.",
+    "deleteBody": "El entorno irá a la papelera (30 días). Puedes deshacerlo.",
     "moveAllTitle": "Saca los valores secretos del archivo del entorno y los guarda en el llavero del sistema",
     "moveOneTitle": "Saca el valor del archivo del entorno y lo guarda en el llavero del sistema (Credential Manager, Keychain o Secret Service)",
     "inKeyringTitle": "En el llavero del sistema: el archivo del entorno no guarda el valor",
@@ -409,9 +411,9 @@
     "newEnvironment": "Nuevo entorno",
     "renameTitle": "Renombrar «{name}»",
     "deleteTitle": "¿Eliminar «{name}»?",
-    "deleteCollection": "Se borrará la colección y su archivo del workspace.",
-    "deleteFolder": "Se borrará la carpeta y todo lo que contiene.",
-    "deleteRequest": "Se borrará la petición de la colección.",
+    "deleteCollection": "La colección irá a la papelera (30 días). Puedes deshacerlo.",
+    "deleteFolder": "La carpeta y todo lo que contiene irán a la papelera (30 días). Puedes deshacerlo.",
+    "deleteRequest": "La petición irá a la papelera (30 días). Puedes deshacerlo.",
     "unsavedTitle": "Cambios sin guardar",
     "unsavedBody": "«{name}» tiene cambios sin guardar. ¿Guardarlos antes de cerrar?",
     "saveAsTitle": "Guardar petición",
@@ -559,5 +561,77 @@
     "choose": "Elegir…",
     "add": "Añadir certificado",
     "remove": "Quitar certificado"
+  },
+  "trash": {
+    "moved": "«{name}» está en la papelera",
+    "undo": "Deshacer",
+    "restored": "Restaurado desde la papelera",
+    "open": "Papelera",
+    "openTitle": "Lo que has borrado en los últimos 30 días",
+    "title": "Papelera",
+    "close": "Cerrar",
+    "hint": "Lo que borras se queda aquí 30 días. «Restaurar» lo devuelve a su sitio; «Borrar para siempre» no se puede deshacer.",
+    "nothing": "La papelera está vacía.",
+    "kind": {
+      "collection": "Colección",
+      "folder": "Carpeta",
+      "request": "Petición",
+      "environment": "Entorno"
+    },
+    "requests": "{count} peticiones",
+    "restore": "Restaurar",
+    "purge": "Borrar para siempre",
+    "purgeTitle": "¿Borrar «{name}» para siempre?",
+    "purgeBody": "No se puede deshacer. Si es un entorno, también se borran sus secretos del llavero del sistema.",
+    "empty": "Vaciar papelera",
+    "emptyTitle": "¿Vaciar la papelera?",
+    "emptyBody": "Todo lo que hay en la papelera se borrará para siempre. No se puede deshacer."
+  },
+  "examples": {
+    "save": "Guardar como ejemplo",
+    "saveTitle": "Guarda esta respuesta (ya enmascarada) como ejemplo de la petición",
+    "saveFirst": "Guarda la petición para poder guardarle ejemplos",
+    "nameTitle": "Nombre del ejemplo",
+    "saveConfirm": "Guardar",
+    "saved": "Ejemplo «{name}» guardado",
+    "unsaved": "Guarda la petición para poder guardarle ejemplos.",
+    "empty": "Aún no hay ejemplos. Envía la petición y pulsa «Guardar como ejemplo» en la respuesta.",
+    "rename": "Renombrar",
+    "renameTitle": "Renombrar «{name}»",
+    "delete": "Eliminar",
+    "deleteTitle": "¿Eliminar el ejemplo «{name}»?",
+    "deleteBody": "El ejemplo se borrará de la petición.",
+    "noBody": "Respuesta sin cuerpo."
+  },
+  "find": {
+    "title": "Buscar y reemplazar",
+    "close": "Cerrar",
+    "find": "Buscar",
+    "with": "Reemplazar con",
+    "caseSensitive": "Mayúsculas y minúsculas",
+    "wholeWord": "Palabra completa",
+    "regex": "Expresión regular",
+    "count": "{count} coincidencias en {fields} campos",
+    "none": "Sin coincidencias.",
+    "replacePicked": "Reemplazar seleccionados",
+    "replaceAll": "Reemplazar todo",
+    "replace": "Reemplazar",
+    "confirmTitle": "¿Reemplazar {count} coincidencias?",
+    "confirmBody": "Los cambios se guardan en la colección. Las credenciales también se reemplazan, aunque aquí se muestren como ***.",
+    "replaced": "{count} reemplazos hechos",
+    "field": {
+      "name": "Nombre",
+      "url": "URL",
+      "params": "Params",
+      "headers": "Headers",
+      "body": "Body",
+      "auth": "Auth",
+      "scripts": {
+        "pre": "Pre-request",
+        "test": "Tests"
+      },
+      "description": "Descripción",
+      "variables": "Variables"
+    }
   }
 }

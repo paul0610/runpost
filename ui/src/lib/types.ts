@@ -39,6 +39,44 @@ export type Auth =
       client_auth?: ClientAuth;
     };
 
+/** Respuesta guardada como ejemplo de una petición (sale del historial, ya enmascarada). */
+export interface Example {
+  id: string;
+  name: string;
+  request: { method: string; url: string; headers?: KeyValue[]; body?: string };
+  status: number;
+  status_text: string;
+  headers?: KeyValue[];
+  body: string;
+}
+
+/** Algo en la papelera. */
+export interface TrashItem {
+  id: string;
+  kind: 'collection' | 'folder' | 'request' | 'environment';
+  name: string;
+  /** Colección de una carpeta o petición. */
+  location: string;
+  deleted_at: number;
+  requests: number;
+}
+
+/** Coincidencias de "Buscar y reemplazar" en un campo. */
+export interface FindMatch {
+  item_id: string;
+  kind: 'collection' | 'folder' | 'request';
+  path: string;
+  field: string;
+  count: number;
+  preview: string;
+}
+
+export interface FindOptions {
+  case_sensitive: boolean;
+  whole_word: boolean;
+  regex: boolean;
+}
+
 /** Certificado de cliente (PEM) para un host: `api.example.com` o `*.example.com`. */
 export interface ClientCert {
   host: string;
@@ -115,6 +153,8 @@ export interface Request {
   scripts: Scripts;
   settings: RequestSettings;
   description: string;
+  /** Respuestas guardadas como ejemplo. */
+  examples?: Example[];
 }
 
 export interface Folder {

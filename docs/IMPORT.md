@@ -27,9 +27,11 @@ cURL crean siempre una colección nueva.
 
 ### Postman v2.1
 
-Colecciones y entornos, con carpetas, auth (`noauth`, `inherit`, `bearer`, `basic`, `apikey`),
-cuerpos, scripts `pm.*` y variables. Las variables `secret` de un entorno siguen siendo secretas.
-Las variables de ruta (`:id`) se quedan tal cual en la URL.
+Colecciones y entornos, con carpetas, auth (`noauth`, `inherit`, `bearer`, `basic`, `apikey`,
+`digest` y `oauth2` con client credentials o authorization code), cuerpos, scripts `pm.*`,
+variables y ejemplos guardados (`response`, que pasan a los [ejemplos](COLLECTIONS.md) de la
+petición). Las variables `secret` de un entorno siguen siendo secretas. Las variables de ruta (`:id`)
+se quedan tal cual en la URL.
 
 ### OpenAPI 3 (JSON o YAML)
 

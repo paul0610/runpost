@@ -11,6 +11,10 @@ import type {
   Collection,
   CollectionSummary,
   CookieInfo,
+  Example,
+  FindMatch,
+  FindOptions,
+  TrashItem,
   Environment,
   Globals,
   HistoryEntry,
@@ -42,7 +46,7 @@ import { policyDraft, policySnapshot, toPolicy, type PolicyDraft } from '../poli
 import { meterMarkdown } from '../agent';
 
 export type Pane = 'collections' | 'environments' | 'history' | 'agent';
-export type SubTab = 'params' | 'auth' | 'headers' | 'body' | 'scripts' | 'settings' | 'docs';
+export type SubTab = 'params' | 'auth' | 'headers' | 'body' | 'scripts' | 'settings' | 'docs' | 'examples';
 export type RespTab = 'body' | 'headers' | 'cookies' | 'tests';
 export type BodyView = 'pretty' | 'raw' | 'preview';
 export type DrawerTab = 'console' | 'agent' | 'runner';
@@ -149,6 +153,8 @@ export interface Toast {
   id: number;
   kind: 'info' | 'ok' | 'err';
   text: string;
+  /** Botón del aviso (p. ej. "Deshacer"). */
+  action?: { label: string; run: () => void };
 }
 
 export interface MenuItem {
@@ -314,6 +320,10 @@ class AppStore {
     importOpen: false,
     /** Diálogo "Gestionar cookies" (fase 4). */
     cookiesOpen: false,
+    /** Diálogo de la papelera (fase 4). */
+    trashOpen: false,
+    /** "Buscar y reemplazar" en esta colección (fase 4). */
+    findIn: null as string | null,
     /** Panel "Código" (snippets) a la derecha del editor, como en Postman. */
     code: false,
     codeLang: 'curl' as SnippetLang,
@@ -1192,8 +1202,9 @@ class AppStore {
     const body = item.type === 'folder' ? t('dialog.deleteFolder') : t('dialog.deleteRequest');
     if (!(await this.askConfirm(t('dialog.deleteTitle', { name: item.name }), body, t('dialog.delete'), true))) return;
     try {
-      await api.del(`/collections/${collectionId}/items/${item.id}`);
+      const { trash } = await api.del<{ trash: TrashItem }>(`/collections/${collectionId}/items/${item.id}`);
       await this.reloadCollections();
+      this.toastUndo(trash);
     } catch (error) {
       this.toastError(error);
     }
@@ -1203,11 +1214,110 @@ class AppStore {
     if (!(await this.askConfirm(t('dialog.deleteTitle', { name: collection.name }), t('dialog.deleteCollection'), t('dialog.delete'), true)))
       return;
     try {
-      await api.del(`/collections/${collection.id}`);
+      const { trash } = await api.del<{ trash: TrashItem }>(`/collections/${collection.id}`);
+      await this.reloadCollections();
+      this.toastUndo(trash);
+    } catch (error) {
+      this.toastError(error);
+    }
+  }
+
+  // ---------- papelera (fase 4) ----------
+
+  /** "«X» está en la papelera · Deshacer". */
+  toastUndo(trash: TrashItem | undefined): void {
+    if (!trash) return;
+    const id = ++this.#toastId;
+    this.toasts.push({
+      id,
+      kind: 'ok',
+      text: t('trash.moved', { name: trash.name }),
+      action: { label: t('trash.undo'), run: () => void this.restoreTrash(trash.id) },
+    });
+    setTimeout(() => (this.toasts = this.toasts.filter((toast) => toast.id !== id)), 8000);
+  }
+
+  async listTrash(): Promise<TrashItem[]> {
+    return (await api.get<{ items: TrashItem[] }>('/trash')).items;
+  }
+
+  /** Devuelve a su sitio lo que está en la papelera. */
+  async restoreTrash(id: string): Promise<boolean> {
+    try {
+      await api.post(`/trash/${encodeURIComponent(id)}/restore`);
+      await this.reloadCollections();
+      await this.reloadEnvironments();
+      this.toast('ok', t('trash.restored'));
+      return true;
+    } catch (error) {
+      this.toastError(error);
+      return false;
+    }
+  }
+
+  /** Borra para siempre una entrada o, sin id, toda la papelera. */
+  async purgeTrash(id?: string): Promise<void> {
+    await api.del(id ? `/trash/${encodeURIComponent(id)}` : '/trash');
+  }
+
+  // ---------- ejemplos guardados (fase 4) ----------
+
+  /** "Guardar como ejemplo": la respuesta de una ejecución (del historial, ya enmascarada). */
+  async saveExample(collectionId: string, requestId: string, historyId: string, name?: string): Promise<Example | null> {
+    try {
+      const { example } = await api.post<{ example: Example }>(`/collections/${collectionId}/items/${requestId}/examples`, {
+        history_id: historyId,
+        name: name ?? null,
+      });
+      await this.reloadCollections();
+      this.toast('ok', t('examples.saved', { name: example.name }));
+      return example;
+    } catch (error) {
+      this.toastError(error);
+      return null;
+    }
+  }
+
+  async renameExample(collectionId: string, requestId: string, exampleId: string, name: string): Promise<void> {
+    try {
+      await api.patch(`/collections/${collectionId}/items/${requestId}/examples/${exampleId}`, { name });
       await this.reloadCollections();
     } catch (error) {
       this.toastError(error);
     }
+  }
+
+  async deleteExample(collectionId: string, requestId: string, exampleId: string): Promise<void> {
+    try {
+      await api.del(`/collections/${collectionId}/items/${requestId}/examples/${exampleId}`);
+      await this.reloadCollections();
+    } catch (error) {
+      this.toastError(error);
+    }
+  }
+
+  // ---------- buscar y reemplazar (fase 4) ----------
+
+  async findInCollection(collectionId: string, query: string, options: FindOptions): Promise<FindMatch[]> {
+    return (await api.post<{ matches: FindMatch[] }>(`/collections/${collectionId}/find`, { query, ...options })).matches;
+  }
+
+  /** Reemplaza en toda la colección o solo en `targets`; devuelve cuántos cambios hizo. */
+  async replaceInCollection(
+    collectionId: string,
+    query: string,
+    replacement: string,
+    options: FindOptions,
+    targets?: { item_id: string; field: string }[],
+  ): Promise<number> {
+    const { replaced } = await api.post<{ replaced: number }>(`/collections/${collectionId}/replace`, {
+      query,
+      replacement,
+      ...options,
+      targets: targets ?? null,
+    });
+    await this.reloadCollections();
+    return replaced;
   }
 
   /** Arrastrar y soltar: dentro de una carpeta, antes de un hermano o al final de una colección. */
@@ -1484,7 +1594,8 @@ class AppStore {
   async deleteEnvironment(env: Environment): Promise<void> {
     if (!(await this.askConfirm(t('dialog.deleteTitle', { name: env.name }), t('env.deleteBody'), t('dialog.delete'), true))) return;
     try {
-      await api.del(`/environments/${env.id}`);
+      const { trash } = await api.del<{ trash: TrashItem }>(`/environments/${env.id}`);
+      this.toastUndo(trash);
       if (this.settings?.active_environment === env.id || this.settings?.active_environment === env.name) {
         await this.setActiveEnvironment(null);
       }

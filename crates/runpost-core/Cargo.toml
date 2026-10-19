@@ -20,6 +20,7 @@ keyring.workspace = true
 md-5.workspace = true
 notify.workspace = true
 reqwest.workspace = true
+regex.workspace = true
 rquickjs.workspace = true
 rusqlite.workspace = true
 serde.workspace = true

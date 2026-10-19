@@ -20,6 +20,7 @@ export function collectionMenu(collection: Collection): MenuItem[] {
     separator,
     { label: t('menu.docs'), action: () => store.openDocs(collection.id, null) },
     { label: t('menu.agent'), action: () => store.openPolicy(collection.id) },
+    { label: t('menu.findReplace'), action: () => (store.ui.findIn = collection.id) },
     { label: t('menu.duplicate'), action: () => store.duplicateCollection(collection) },
     { label: t('menu.rename'), action: () => store.renameCollection(collection) },
     { label: t('menu.export'), action: () => store.exportCollection(collection.id) },

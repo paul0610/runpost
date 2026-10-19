@@ -988,3 +988,51 @@ describe('cookies (fase 4)', () => {
     expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/cookies' });
   });
 });
+
+describe('papelera (fase 4)', () => {
+  const entry = { id: 'trash_1', kind: 'request' as const, name: 'ping', location: 'C', deleted_at: 1, requests: 1 };
+
+  it('borrar deja un aviso con «Deshacer» que restaura desde la papelera', async () => {
+    collections = [collection(request())];
+    store.collections = collections;
+    responses['DELETE /collections/col_1/items/req_1'] = { trash: entry };
+    const deleting = store.deleteItem('col_1', { type: 'request', ...request() });
+    (await dialogOf('confirm')).resolve(true);
+    await deleting;
+    const toast = store.toasts.at(-1);
+    expect(toast).toMatchObject({ kind: 'ok' });
+    expect(toast?.text).toContain('ping');
+    toast?.action?.run();
+    await vi.waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/trash/trash_1/restore')).toBe(true));
+  });
+
+  it('lista, borra una entrada para siempre y vacía la papelera', async () => {
+    responses['GET /trash'] = { items: [entry] };
+    expect(await store.listTrash()).toEqual([entry]);
+    await store.purgeTrash('trash_1');
+    expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/trash/trash_1' });
+    await store.purgeTrash();
+    expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/trash' });
+  });
+});
+
+describe('ejemplos y buscar y reemplazar (fase 4)', () => {
+  it('guarda como ejemplo la respuesta de una ejecución del historial', async () => {
+    const example = { id: 'exm_1', name: '200 OK', request: { method: 'GET', url: 'http://h/ping' }, status: 200, status_text: 'OK', body: '{}' };
+    responses['POST /collections/col_1/items/req_1/examples'] = { collection_id: 'col_1', example };
+    expect(await store.saveExample('col_1', 'req_1', 'hist_1')).toEqual(example);
+    expect(calls.find((c) => c.path.endsWith('/examples'))?.body).toEqual({ history_id: 'hist_1', name: null });
+    expect(store.toasts.at(-1)).toMatchObject({ kind: 'ok' });
+  });
+
+  it('busca con las opciones y reemplaza solo en los campos elegidos', async () => {
+    const options = { case_sensitive: true, whole_word: false, regex: false };
+    responses['POST /collections/col_1/find'] = { matches: [{ item_id: 'req_1', kind: 'request', path: 'C/F/ping', field: 'url', count: 1, preview: 'acme' }] };
+    expect(await store.findInCollection('col_1', 'acme', options)).toHaveLength(1);
+    expect(calls.at(-1)?.body).toEqual({ query: 'acme', ...options });
+    responses['POST /collections/col_1/replace'] = { replaced: 2, collection: {} };
+    const targets = [{ item_id: 'req_1', field: 'url' }];
+    expect(await store.replaceInCollection('col_1', 'acme', 'demo', options, targets)).toBe(2);
+    expect(calls.find((c) => c.path === '/collections/col_1/replace')?.body).toEqual({ query: 'acme', replacement: 'demo', ...options, targets });
+  });
+});
