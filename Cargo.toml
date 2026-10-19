@@ -3,7 +3,7 @@ members = ["crates/runpost-core", "crates/runpost-server", "crates/runpost-mcp",
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT"
@@ -70,9 +70,9 @@ regex = "=1.13.1"
 rcgen = { version = "=0.14.10", default-features = false, features = ["aws_lc_rs", "pem"] }
 rustls = { version = "=0.23.46", default-features = false, features = ["aws_lc_rs", "std"] }
 tokio-rustls = { version = "=0.26.6", default-features = false, features = ["aws_lc_rs"] }
-runpost-core = { path = "crates/runpost-core", version = "=0.1.0" }
-runpost-server = { path = "crates/runpost-server", version = "=0.1.0" }
-runpost-mcp = { path = "crates/runpost-mcp", version = "=0.1.0" }
+runpost-core = { path = "crates/runpost-core", version = "=0.2.0" }
+runpost-server = { path = "crates/runpost-server", version = "=0.2.0" }
+runpost-mcp = { path = "crates/runpost-mcp", version = "=0.2.0" }
 
 # Tamaño (objetivos en docs/BENCH.md): LTO completo, una sola unidad de código y optimizar por
 # tamaño, como recomienda Tauri. Compila más lento que con `lto = "thin"`, pero los binarios pesan

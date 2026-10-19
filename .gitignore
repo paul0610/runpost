@@ -8,6 +8,9 @@
 /workspace/*.db*
 # Entornos locales: solo fixtures falsos y exports revisados entran en Git.
 /workspace/environments/*.env.json
+# Colecciones y papelera del workspace local de desarrollo: pueden ser datos reales.
+/workspace/collections/
+/workspace/.trash/
 .env
 .env.*
 !.env.example

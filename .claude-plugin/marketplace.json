@@ -12,7 +12,7 @@
       "name": "runpost",
       "source": "./plugin",
       "description": "Run saved API requests and collections through RunPost's MCP server, with the api-testing skill and /runpost commands.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "Paul Rojas"
       },

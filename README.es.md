@@ -70,7 +70,7 @@ están firmados, así que el primer arranque pide confirmación.
 **Windows** (PowerShell; instalación por usuario en `%LOCALAPPDATA%\RunPost`, con `runpost_mcp.exe`):
 
 ```powershell
-Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_x64-setup.exe -OutFile RunPost-setup.exe
+Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_x64-setup.exe -OutFile RunPost-setup.exe
 .\RunPost-setup.exe
 [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ";$env:LOCALAPPDATA\RunPost", 'User')
 ```
@@ -78,16 +78,16 @@ Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.1.0/R
 **macOS** (Apple silicon):
 
 ```bash
-curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_aarch64.dmg
-hdiutil attach RunPost_0.1.0_aarch64.dmg && cp -R /Volumes/RunPost/RunPost.app /Applications/ && hdiutil detach /Volumes/RunPost
+curl -LO https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_aarch64.dmg
+hdiutil attach RunPost_0.2.0_aarch64.dmg && cp -R /Volumes/RunPost/RunPost.app /Applications/ && hdiutil detach /Volumes/RunPost
 xattr -dr com.apple.quarantine /Applications/RunPost.app && sudo ln -sf /Applications/RunPost.app/Contents/MacOS/runpost_mcp /usr/local/bin/runpost_mcp
 ```
 
 **Linux** (Debian/Ubuntu; también hay `.AppImage`):
 
 ```bash
-curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_amd64.deb
-sudo apt install ./RunPost_0.1.0_amd64.deb
+curl -LO https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_amd64.deb
+sudo apt install ./RunPost_0.2.0_amd64.deb
 runpost_app
 ```
 

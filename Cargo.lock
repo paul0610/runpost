@@ -4292,7 +4292,7 @@ dependencies = [
 
 [[package]]
 name = "runpost-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4311,7 +4311,7 @@ dependencies = [
 
 [[package]]
 name = "runpost-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -4349,7 +4349,7 @@ dependencies = [
 
 [[package]]
 name = "runpost-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4370,7 +4370,7 @@ dependencies = [
 
 [[package]]
 name = "runpost-mcp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "http",
@@ -4389,7 +4389,7 @@ dependencies = [
 
 [[package]]
 name = "runpost-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",

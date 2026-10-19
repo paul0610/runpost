@@ -29,7 +29,7 @@
           servidor MCP integrado: tu agente ejecuta tus peticiones guardadas con respuestas compactas y los
           secretos tapados, y tú ves cada llamada en vivo y apruebas las delicadas.</p>
         <div class="buttons">
-          <a class="button primary" href="https://github.com/paul0610/runpost/releases/latest">Descargar v0.1.0</a>
+          <a class="button primary" href="https://github.com/paul0610/runpost/releases/latest">Descargar v0.2.0</a>
           <a class="button" href="#agentes">Conectar tu agente</a>
           <a class="button" href="https://github.com/paul0610/runpost">Código en GitHub</a>
         </div>
@@ -55,16 +55,16 @@
         <p>Los binarios aún no están firmados, así que el primer arranque pide confirmación. Cada bloque
           termina dejando <code>runpost_mcp</code> (CLI y servidor MCP) en el <code>PATH</code>.</p>
         <h3>Windows</h3>
-        <pre><code>Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_x64-setup.exe -OutFile RunPost-setup.exe
+        <pre><code>Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_x64-setup.exe -OutFile RunPost-setup.exe
 .\RunPost-setup.exe
 [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','User') + ";$env:LOCALAPPDATA\RunPost", 'User')</code></pre>
         <h3>macOS (Apple silicon)</h3>
-        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_aarch64.dmg
-hdiutil attach RunPost_0.1.0_aarch64.dmg &amp;&amp; cp -R /Volumes/RunPost/RunPost.app /Applications/ &amp;&amp; hdiutil detach /Volumes/RunPost
+        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_aarch64.dmg
+hdiutil attach RunPost_0.2.0_aarch64.dmg &amp;&amp; cp -R /Volumes/RunPost/RunPost.app /Applications/ &amp;&amp; hdiutil detach /Volumes/RunPost
 xattr -dr com.apple.quarantine /Applications/RunPost.app &amp;&amp; sudo ln -sf /Applications/RunPost.app/Contents/MacOS/runpost_mcp /usr/local/bin/runpost_mcp</code></pre>
         <h3>Linux (Debian / Ubuntu; también AppImage)</h3>
-        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.1.0/RunPost_0.1.0_amd64.deb
-sudo apt install ./RunPost_0.1.0_amd64.deb
+        <pre><code>curl -LO https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_amd64.deb
+sudo apt install ./RunPost_0.2.0_amd64.deb
 runpost_app</code></pre>
       </section>
 
