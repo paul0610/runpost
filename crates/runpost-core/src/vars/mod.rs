@@ -145,6 +145,42 @@ impl Resolver {
         out
     }
 
+    /// Para texto que sale de la app (snippets): sustituye solo las variables que no son secretas
+    /// ni dinámicas; las demás, y las desconocidas, quedan como `{{nombre}}`.
+    pub fn resolve_safe(&self, input: &str) -> String {
+        self.expand_safe(input, &mut Vec::new())
+    }
+
+    fn expand_safe(&self, input: &str, stack: &mut Vec<String>) -> String {
+        let mut text = String::with_capacity(input.len());
+        let mut rest = input;
+        while let Some(start) = rest.find("{{") {
+            text.push_str(&rest[..start]);
+            let after = &rest[start + 2..];
+            let Some(end) = after.find("}}") else {
+                rest = &rest[start..];
+                break;
+            };
+            let raw = &after[..end];
+            let name = raw.trim();
+            rest = &after[end + 2..];
+            let cycle = stack.iter().any(|seen| seen == name) || stack.len() >= MAX_DEPTH;
+            match self
+                .lookup(name)
+                .filter(|found| !cycle && !found.secret && found.scope != Scope::Dynamic)
+            {
+                Some(found) if !name.is_empty() && !name.contains('{') => {
+                    stack.push(name.to_owned());
+                    text.push_str(&self.expand_safe(&found.value, stack));
+                    stack.pop();
+                }
+                _ => text.push_str(&format!("{{{{{raw}}}}}")),
+            }
+        }
+        text.push_str(rest);
+        text
+    }
+
     fn expand(
         &self,
         input: &str,

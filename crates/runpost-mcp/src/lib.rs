@@ -119,7 +119,9 @@ impl RunPostMcp {
         reply("list_requests", Instant::now(), self.tools.list_requests(p))
     }
 
-    #[tool(description = "Saved request in native format, only the requested fields.")]
+    #[tool(
+        description = "Saved request in native format, only the requested fields; or as a curl, fetch, PowerShell or Python snippet."
+    )]
     async fn get_request(
         &self,
         Parameters(p): Parameters<params::GetRequest>,

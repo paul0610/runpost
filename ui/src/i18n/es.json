@@ -133,8 +133,8 @@
     "choose": "Elegir…",
     "path": "Ruta del archivo",
     "pathHint": "En el navegador escribe la ruta completa del archivo.",
-    "query": "Query",
-    "variables": "Variables (JSON)"
+    "query": "Consulta",
+    "variables": "Variables de GraphQL (JSON)"
   },
   "scripts": {
     "pre": "Pre-request",
@@ -476,5 +476,15 @@
     "api": "API local",
     "mcp": "MCP para agentes",
     "workspace": "Workspace"
+  },
+  "code": {
+    "title": "Fragmento de código",
+    "button": "Código",
+    "language": "Lenguaje",
+    "copy": "Copiar",
+    "copied": "Código copiado. Los secretos quedan como {{variable}}, sin su valor.",
+    "copyFailed": "No se pudo usar el portapapeles: selecciona el código y cópialo.",
+    "close": "Cerrar",
+    "note": "Las variables normales se sustituyen; los secretos quedan como {{variable}}."
   }
 }

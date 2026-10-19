@@ -118,6 +118,9 @@ export interface Globals {
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+/** Lenguajes del panel Código y de `/codegen/{lang}` (fase 4). */
+export type SnippetLang = 'curl' | 'fetch' | 'powershell' | 'python';
+
 export interface Settings {
   schema: number;
   theme: ThemeMode;

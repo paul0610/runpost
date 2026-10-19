@@ -57,7 +57,7 @@ Configuración de clientes en [mcp-client-configs/](mcp-client-configs/).
 |---|---|---|
 | `ws_overview` | — | `{"collections":[{"id","name","requests"}],"environments":[{"id","name","active"}],"active_env"}` |
 | `list_requests` | `collection`, `folder`, `q` | `[{"id","path","m","url"}]` (url sin resolver) |
-| `get_request` | **`request`**, `fields` (`method,url,params,headers,body` por defecto; también `auth,scripts,settings,description,name`) | petición nativa (5.1) con `id` + los campos pedidos |
+| `get_request` | **`request`**, `fields` (`method,url,params,headers,body` por defecto; también `auth,scripts,settings,description,name`), `snippet` (`curl` \| `fetch` \| `powershell` \| `python`) | petición nativa con `id` + los campos pedidos; con `snippet`, `{"id","snippet"}`: el código con las variables normales resueltas, la auth heredada y los secretos como `{{nombre}}` |
 | `run_request` | **`request`**, `env`, `vars` `{k:v}`, `select`, `body_max`, `headers`, `save_history` (true) | forma de arriba |
 | `send` | **`method`**, **`url`**, `headers` `{k:v}`, `body` (texto o JSON), `auth` (nativa, 5.4), `env`, `select`, `body_max`, `save_as` `{collection, folder?, name}` | forma de arriba (+ `saved_id`). Con `save_as`, la petición se guarda antes de enviarla y hereda variables y auth de esa colección |
 | `get_response` | **`response_id`**, `select`, `range` `[desde, hasta)` en caracteres, `headers`, `diff_against` (`"ref"` o otro `response_id`), `ignore` (campos volátiles extra), `save_ref` | `{"body"}` (+ `truncated`/`total_chars`), `{"body","range","total_chars"}` o `{"headers":{…}}`; con `diff_against`, `{"diff":[{"path","from"?,"to"?}],"more"?}` (ver abajo); con `save_ref`, `{"ref_saved":true}` |

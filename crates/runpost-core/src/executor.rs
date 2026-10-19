@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
+    codegen,
     engine::{self, ClientKey, Clients, ResolvedRequest, Response},
     error::NetworkError,
     model::{
@@ -110,6 +111,70 @@ pub struct RequestDraft {
     pub scripts: Scripts,
     #[serde(default)]
     pub collection_id: Option<String>,
+}
+
+impl RequestDraft {
+    /// Petición sin id ni nombre (no está guardada).
+    pub fn into_request(self) -> Request {
+        Request {
+            id: String::new(),
+            name: String::new(),
+            method: self.method,
+            url: self.url,
+            params: self.params,
+            headers: self.headers,
+            auth: self.auth,
+            body: self.body,
+            scripts: self.scripts,
+            settings: self.settings,
+            description: String::new(),
+        }
+    }
+}
+
+/// Snippet de código de una petición guardada (aunque traiga cambios sin guardar) o de un borrador
+/// de `collection_id`: auth heredada de carpetas y colección, y variables del entorno (`env_id` o el
+/// activo), la colección y las globales. Los secretos quedan como `{{nombre}}`.
+pub fn snippet(
+    ws: &Workspace,
+    request: &Request,
+    collection_id: Option<&str>,
+    env_id: Option<&str>,
+    lang: codegen::Lang,
+) -> Result<String> {
+    let mut owner: Option<Collection> = None;
+    if !request.id.is_empty() {
+        for summary in ws.collections()? {
+            let collection = ws.load_collection(&summary.id)?;
+            if collection.parents_of(&request.id).is_some() {
+                owner = Some(collection);
+                break;
+            }
+        }
+    }
+    if owner.is_none()
+        && let Some(id) = collection_id
+    {
+        owner = Some(ws.find_collection(id)?);
+    }
+    let parents = owner
+        .as_ref()
+        .and_then(|c| c.parents_of(&request.id))
+        .unwrap_or_default();
+    let auth = engine::auth::effective_auth(owner.as_ref(), &parents, request);
+    let environment = ws.active_environment(env_id)?;
+    let globals = ws.globals()?;
+    let resolver = Resolver::new()
+        .with_variables(
+            Scope::Environment,
+            environment.as_ref().map_or(&[][..], |e| &e.variables),
+        )
+        .with_variables(
+            Scope::Collection,
+            owner.as_ref().map_or(&[][..], |c| &c.variables),
+        )
+        .with_variables(Scope::Globals, &globals.variables);
+    Ok(codegen::render(lang, request, &auth, &resolver))
 }
 
 /// Un eslabón de la cadena de scripts: colección → carpetas → petición.
@@ -325,19 +390,7 @@ impl Executor {
             Some(id) => Some(ws.find_collection(id)?),
             None => None,
         };
-        let request = Request {
-            id: String::new(),
-            name: String::new(),
-            method: draft.method,
-            url: draft.url,
-            params: draft.params,
-            headers: draft.headers,
-            auth: draft.auth,
-            body: draft.body,
-            scripts: draft.scripts,
-            settings: draft.settings,
-            description: String::new(),
-        };
+        let request = draft.into_request();
         let auth = engine::auth::effective_auth(collection.as_ref(), &[], &request);
         let links = chain(collection.as_ref(), &[], &request);
         self.execute(ws, &request, collection.as_ref(), &links, &auth, None, ctx)

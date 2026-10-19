@@ -11,7 +11,9 @@ use std::{
 use runpost_core::{
     CoreError, Executor, RequestDraft, RequestSelector, RunContext, RunResult, Source, Workspace,
     budget::{self, Budget, RunDetail, Shaped},
+    codegen,
     diff::{self, Side},
+    executor,
     import::postman_v21::PostmanKind,
     model::{
         Auth, Body, Collection, Environment, Folder, Item, KeyValue, RawLang, Request, SecretStore,
@@ -493,6 +495,17 @@ impl Tools {
             .ws
             .find_request(&RequestSelector::parse(&p.request))
             .map_err(|e| self.fail(&e))?;
+        if let Some(lang) = p.snippet.as_deref() {
+            let lang = codegen::Lang::parse(lang).ok_or_else(|| {
+                error(
+                    "invalid_request",
+                    "snippet is curl, fetch, powershell or python",
+                )
+            })?;
+            let code = executor::snippet(&self.ws, &request, None, None, lang)
+                .map_err(|e| self.fail(&e))?;
+            return Ok(json!({"id": request.id, "snippet": code}));
+        }
         let full = serde_json::to_value(&request).unwrap_or_default();
         let fields = p.fields.unwrap_or_else(|| {
             ["method", "url", "params", "headers", "body"]

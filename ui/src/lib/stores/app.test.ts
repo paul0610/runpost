@@ -907,3 +907,29 @@ describe('llavero (S6)', () => {
     expect(store.toasts.at(-1)).toMatchObject({ kind: 'err' });
   });
 });
+
+describe('snippets (fase 4)', () => {
+  it('"Copiar como curl" pide el código al servidor: guardada con su id, borrador con su colección', async () => {
+    const { copyText } = await import('../native');
+    responses['POST /codegen/curl'] = { lang: 'curl', code: "curl --location 'http://h/ping'" };
+    store.settings = { active_environment: 'env_1' } as Settings;
+    await store.copyCurl('col_1', request());
+    const saved = calls.find((c) => c.path === '/codegen/curl');
+    expect(saved?.body).toMatchObject({ request: { id: 'req_1', url: '{{base}}/ping' }, env_id: 'env_1' });
+    expect(copyText).toHaveBeenLastCalledWith("curl --location 'http://h/ping'");
+    expect(store.toasts.at(-1)).toMatchObject({ kind: 'ok' });
+
+    calls.length = 0;
+    await store.copyCurl('col_1', request({ id: '' }));
+    const draft = calls.find((c) => c.path === '/codegen/curl')?.body as { request: Record<string, unknown> };
+    expect(draft.request.collection_id).toBe('col_1');
+    expect(draft.request).not.toHaveProperty('id');
+  });
+
+  it('el panel Código recuerda si está abierto y el lenguaje', () => {
+    store.ui.code = true;
+    store.ui.codeLang = 'python';
+    store.persist();
+    expect(JSON.parse(localStorage.getItem('runpost.ui') ?? '{}')).toMatchObject({ code: true, codeLang: 'python' });
+  });
+});

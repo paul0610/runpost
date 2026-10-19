@@ -96,6 +96,13 @@
       {tab.sending ? t('req.sending') : t('req.send')} <kbd>Ctrl+↵</kbd>
     </button>
     <button onclick={() => store.saveTab(tab)}>{t('req.save')}</button>
+    <button
+      class="icon ghost snippet"
+      class:on={store.ui.code}
+      title={t('code.title')}
+      aria-label={t('code.button')}
+      aria-pressed={store.ui.code}
+      onclick={() => (store.ui.code = !store.ui.code)}>&lt;/&gt;</button>
     <button class="icon ghost" title={t('req.more')} aria-label={t('req.more')} onclick={moreMenu}>⋯</button>
   </div>
 
@@ -202,6 +209,8 @@
   .urlbar { display: flex; gap: 8px; align-items: center; flex: none; }
   .method { font-weight: 700; width: 104px; }
   .send kbd { color: var(--on-accent); border: none; padding: 0; opacity: .7; margin-left: 4px; font-size: 10px; }
+  .snippet { font-family: var(--mono, monospace); font-size: 12px; font-weight: 700; }
+  .snippet.on { color: var(--accent); }
   .subtabs { margin-top: 10px; flex: none; }
   .pane { flex: 1; min-height: 0; overflow: auto; padding: 10px 0; }
   .scripts { display: flex; flex-direction: column; height: 100%; gap: 8px; }

@@ -421,3 +421,31 @@ async fn get_response_diff_ignores_volatile_fields() {
     );
     assert_eq!(against_ref, json!({"diff": []}));
 }
+
+/// `get_request` con `snippet` (fase 4): código listo para copiar, con las variables resueltas y el
+/// token secreto como `{{accessToken}}`, nunca su valor.
+#[test]
+fn get_request_snippet_keeps_the_secret_as_a_variable() {
+    let dir = acme_workspace();
+    let mut mcp = McpClient::start(dir.path());
+    let reply = mcp.call_json(
+        "get_request",
+        json!({"request": "#7 POST sign (sonda", "snippet": "python"}),
+    );
+    let code = reply["snippet"].as_str().unwrap();
+    assert!(
+        code.contains(r#"url = "http://127.0.0.1:3080/v1/usd/accounts/acc_0123456789abcdef/sign""#),
+        "{code}"
+    );
+    assert!(
+        code.contains(r#""Authorization": "Bearer {{accessToken}}""#),
+        "{code}"
+    );
+    let (bad, is_error) = mcp.call(
+        "get_request",
+        json!({"request": "00.2 Gateway - ping", "snippet": "cobol"}),
+    );
+    assert!(is_error && bad.contains("invalid_request"), "{bad}");
+    let transcript = mcp.finish();
+    assert!(!transcript.contains(FAKE_TOKEN));
+}

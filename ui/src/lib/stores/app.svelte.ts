@@ -23,6 +23,7 @@ import type {
   RunnerItem,
   RunnerReport,
   Settings,
+  SnippetLang,
   ThemeMode,
   Variable,
   WsEvent,
@@ -32,9 +33,8 @@ import { applyTheme, nextTheme, watchSystemTheme } from '../theme';
 import { copyText, downloadText, pickFiles, pickSavePath, type PickedFiles } from '../native';
 import { applyUrlText, composeUrl } from '../url';
 import { lookupFrom, type VarLookup } from '../vars';
-import { toCurl } from '../curl';
 import type { VarDescriber } from '../cm';
-import { draftPayload, emptyRequest, findRequest, inheritedAuth, locate, normalizeRequest, snapshot, type Draft } from './requests';
+import { draftPayload, emptyRequest, findRequest, locate, normalizeRequest, snapshot, type Draft } from './requests';
 import { policyDraft, policySnapshot, toPolicy, type PolicyDraft } from '../policy';
 import { meterMarkdown } from '../agent';
 
@@ -174,6 +174,13 @@ interface UiPersisted {
   pane?: Pane;
   sideOpen?: boolean;
   splitPx?: number;
+  code?: boolean;
+  codeLang?: SnippetLang;
+}
+
+/** Lo que reciben /send y /codegen: la petición guardada (con sus cambios) o un borrador. */
+function requestPayload(request: Request, requestId: string | null, collectionId: string | null) {
+  return requestId ? { ...request, id: requestId } : draftPayload(request, collectionId);
 }
 
 const TABS_KEY = 'runpost.tabs';
@@ -300,6 +307,9 @@ class AppStore {
     palette: false,
     settings: false,
     about: false,
+    /** Panel "Código" (snippets) a la derecha del editor, como en Postman. */
+    code: false,
+    codeLang: 'curl' as SnippetLang,
     envMenu: false,
     quicklook: false,
   });
@@ -387,6 +397,8 @@ class AppStore {
         this.ui.pane = ui.pane ?? this.ui.pane;
         this.ui.sideOpen = ui.sideOpen ?? true;
         this.ui.splitPx = ui.splitPx ?? this.ui.splitPx;
+        this.ui.code = ui.code ?? false;
+        this.ui.codeLang = ui.codeLang ?? this.ui.codeLang;
       }
       this.collapsed = load(COLLAPSED_KEY, [] as string[]);
       await Promise.all([this.reloadSettings(), this.reloadCollections(), this.reloadEnvironments(), this.reloadGlobals()]);
@@ -651,7 +663,13 @@ class AppStore {
       }),
       active: this.activeTabId,
     });
-    save(UI_KEY, { pane: this.ui.pane, sideOpen: this.ui.sideOpen, splitPx: this.ui.splitPx });
+    save(UI_KEY, {
+      pane: this.ui.pane,
+      sideOpen: this.ui.sideOpen,
+      splitPx: this.ui.splitPx,
+      code: this.ui.code,
+      codeLang: this.ui.codeLang,
+    });
     save(COLLAPSED_KEY, $state.snapshot(this.collapsed));
   }
 
@@ -756,9 +774,7 @@ class AppStore {
     if (!tab.draft.url.trim()) return;
     tab.sending = true;
     tab.error = null;
-    const request = tab.requestId
-      ? { ...$state.snapshot(tab.draft), id: tab.requestId }
-      : draftPayload($state.snapshot(tab.draft), tab.collectionId);
+    const request = requestPayload($state.snapshot(tab.draft), tab.requestId, tab.collectionId);
     const started = Date.now();
     try {
       const result = await api.post<RunResult>('/send', {
@@ -1275,22 +1291,27 @@ class AppStore {
     }
   }
 
+  /**
+   * Snippet de código (fase 4) que genera el servidor: variables normales resueltas, auth heredada
+   * y los secretos como `{{nombre}}`. `requestId` vacío = borrador de `collectionId`.
+   */
+  async snippet(lang: SnippetLang, request: Request, requestId: string | null, collectionId: string | null): Promise<string> {
+    const { code } = await api.post<{ code: string }>(`/codegen/${lang}`, {
+      request: requestPayload(request, requestId, collectionId),
+      env_id: this.settings?.active_environment ?? null,
+    });
+    return code;
+  }
+
   /** "Copiar como curl" de una petición guardada o de la pestaña actual. */
   async copyCurl(collectionId: string | null, request: Request): Promise<void> {
-    const collection = this.collection(collectionId);
-    const located = collection && request.id ? locate(collection.items, request.id) : null;
-    const auth = request.auth.type === 'inherit' ? inheritedAuth(collection, located?.parents ?? []).auth : request.auth;
-    const lookup = lookupFrom([
-      { scope: 'environment', vars: this.activeEnvironment?.variables },
-      { scope: 'collection', vars: collection?.variables },
-      { scope: 'globals', vars: this.globals.variables },
-    ]);
-    const normalized = normalizeRequest(request);
-    const text = toCurl(
-      { method: normalized.method, url: normalized.url, params: normalized.params, headers: normalized.headers, body: normalized.body },
-      auth,
-      lookup,
-    );
+    let text: string;
+    try {
+      text = await this.snippet('curl', normalizeRequest(request), request.id || null, collectionId);
+    } catch (error) {
+      this.toastError(error);
+      return;
+    }
     try {
       await copyText(text);
       this.toast('ok', t('curl.copied'));

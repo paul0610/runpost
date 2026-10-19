@@ -451,7 +451,35 @@ async function s7() {
   }
 }
 
-if (sprint === 's7') await s7();
+// S8 (fase 4): las pantallas nuevas, como en Postman, en claro y oscuro. Requisitos como s6; además
+// añade a la colección de ejemplo una petición con body GraphQL.
+async function s8() {
+  const summaries = await api('/collections');
+  const collectionId = summaries.find((c) => c.name.startsWith('Acme')).id;
+  const collection = await api(`/collections/${collectionId}`);
+  if (!collection.items.some((i) => i.name === 'GraphQL - cuenta')) {
+    const query = 'query Account($id: ID!) {\n  account(id: $id) {\n    id\n    currency\n    balance\n  }\n}';
+    await api(`/collections/${collectionId}/items`, { parent_id: null, item: { type: 'request', id: '', name: 'GraphQL - cuenta', method: 'POST', url: '{{apiUrl}}/graphql', body: { mode: 'graphql', query, variables: '{\n  "id": "{{accountId}}"\n}' } } }, 'POST');
+  }
+  for (const theme of ['light', 'dark']) {
+    await setTheme(theme);
+    await navigate(appUrl);
+    // Panel Código: snippet de Python de una petición con token secreto (queda como {{accessToken}}).
+    await evaluate(`await pane(0); row('#7 POST sign (sonda').click(); await wait(500);
+      const code = document.querySelector('.urlbar button.snippet'); if (!code.classList.contains('on')) code.click(); await wait(300);
+      const select = document.querySelector('.code-panel select'); select.value = 'python'; select.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(900);`);
+    await shot(`app-code-${theme}.png`);
+    // Body GraphQL: consulta y variables lado a lado.
+    await evaluate(`document.querySelector('.code-panel header button').click(); await wait(200);
+      row('GraphQL - cuenta').click(); await wait(500);
+      [...document.querySelectorAll('.subtabs [role=tab]')].find(b => b.textContent.startsWith('Body')).click(); await wait(600);`);
+    await shot(`app-graphql-${theme}.png`);
+  }
+}
+
+if (sprint === 's8') await s8();
+else if (sprint === 's7') await s7();
 else if (sprint === 'gif') await gif();
 else if (sprint === 's6') await s6();
 else if (sprint === 's5') await s5();

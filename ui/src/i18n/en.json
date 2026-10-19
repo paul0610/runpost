@@ -134,7 +134,7 @@
     "path": "File path",
     "pathHint": "In the browser, type the full path of the file.",
     "query": "Query",
-    "variables": "Variables (JSON)"
+    "variables": "GraphQL variables (JSON)"
   },
   "scripts": {
     "pre": "Pre-request",
@@ -476,5 +476,15 @@
     "api": "Local API",
     "mcp": "MCP for agents",
     "workspace": "Workspace"
+  },
+  "code": {
+    "title": "Code snippet",
+    "button": "Code",
+    "language": "Language",
+    "copy": "Copy",
+    "copied": "Snippet copied. Secrets stay as {{variable}}, without their value.",
+    "copyFailed": "Could not use the clipboard: select the code and copy it.",
+    "close": "Close",
+    "note": "Plain variables are replaced; secrets stay as {{variable}}."
   }
 }

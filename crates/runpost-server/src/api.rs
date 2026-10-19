@@ -13,6 +13,8 @@ use axum::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use runpost_core::{
     CLI_BIN, CoreError, Executor, NetworkError, RequestDraft, RunContext, Source,
+    codegen::Lang,
+    executor::snippet,
     export::postman_v21::{export_collection, export_environment},
     import::postman_v21::PostmanKind,
     model::{Collection, Environment, Globals, Item, Position, Request as SavedRequest, Settings},
@@ -164,6 +166,7 @@ pub(crate) fn routes() -> Router<AppState> {
         )
         .route("/globals", get(get_globals).put(put_globals))
         .route("/send", post(send))
+        .route("/codegen/{lang}", post(codegen))
         .route("/history", get(list_history).delete(clear_history))
         .route("/history/{id}", get(get_history))
         .route(
@@ -482,6 +485,39 @@ async fn send(State(state): State<AppState>, Body(body): Body<SendBody>) -> ApiR
     value["response"]["body"] = body;
     value["response"]["body_encoding"] = json!(encoding);
     ok(value)
+}
+
+// ---- snippets (fase 4) ----
+
+#[derive(Deserialize)]
+struct CodegenBody {
+    request: SendTarget,
+    env_id: Option<String>,
+}
+
+/// Snippet de curl, fetch, PowerShell o Python; los secretos quedan como `{{nombre}}`.
+async fn codegen(
+    State(state): State<AppState>,
+    Path(lang): Path<String>,
+    Body(body): Body<CodegenBody>,
+) -> ApiResult {
+    let lang = Lang::parse(&lang)
+        .ok_or_else(|| ApiError::bad_request(format!("unknown snippet language {lang:?}")))?;
+    let env = body.env_id.filter(|e| !e.is_empty());
+    let ws = &state.workspace;
+    let code = match body.request {
+        SendTarget::ById { request_id } => {
+            let (_, request) = ws.find_request(&runpost_core::RequestSelector::Id(request_id))?;
+            snippet(ws, &request, None, env.as_deref(), lang)?
+        }
+        SendTarget::Saved(request) => snippet(ws, &request, None, env.as_deref(), lang)?,
+        SendTarget::Draft(draft) => {
+            let collection = draft.collection_id.clone();
+            let request = draft.into_request();
+            snippet(ws, &request, collection.as_deref(), env.as_deref(), lang)?
+        }
+    };
+    ok(json!({"lang": lang.as_str(), "code": code}))
 }
 
 // ---- historial ----

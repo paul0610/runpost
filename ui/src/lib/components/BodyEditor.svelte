@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Body (sección 5.3): none / form-data / x-www-form-urlencoded / raw (CodeMirror + Beautify) / binary.
+  // Body (sección 5.3): none / form-data / x-www-form-urlencoded / raw (CodeMirror + Beautify) / binary /
+  // GraphQL (fase 4: consulta y variables lado a lado, como en Postman).
   import { store, type RequestTab } from '../stores/app.svelte';
   import { t } from '../i18n.svelte';
   import { beautifyJson } from '../format';
@@ -13,7 +14,7 @@
 
   const body = $derived(tab.draft.body);
   const describeVar = $derived(store.describerFor(tab));
-  const modes: Body['mode'][] = ['none', 'multipart', 'urlencoded', 'raw', 'binary'];
+  const modes: Body['mode'][] = ['none', 'multipart', 'urlencoded', 'raw', 'binary', 'graphql'];
   const langs: RawLang[] = ['json', 'text', 'xml', 'html', 'javascript'];
   const langLabel: Record<RawLang, string> = { json: 'JSON', text: 'Text', xml: 'XML', html: 'HTML', javascript: 'JavaScript' };
 
@@ -30,7 +31,9 @@
             ? { mode, fields: [] }
             : mode === 'binary'
               ? { mode, path: '' }
-              : { mode: 'none' };
+              : mode === 'graphql'
+                ? { mode, query: text, variables: '' }
+                : { mode: 'none' };
   }
 
   function beautify(): void {
@@ -51,7 +54,6 @@
     {#each modes as mode (mode)}
       <label><input type="radio" name="mode-{tab.id}" checked={body.mode === mode} onchange={() => setMode(mode)} /> {t(`body.${mode}`)}</label>
     {/each}
-    {#if body.mode === 'graphql'}<label><input type="radio" checked disabled /> {t('body.graphql')}</label>{/if}
     {#if body.mode === 'raw'}
       <select class="lang" bind:value={body.lang} aria-label="lang">
         {#each langs as lang (lang)}<option value={lang}>{langLabel[lang]}</option>{/each}
@@ -107,12 +109,19 @@
     </div>
     {#if !isTauri()}<p class="muted small">{t('body.pathHint')}</p>{/if}
   {:else if body.mode === 'graphql'}
-    <div class="code">
-      <CodeEditor value={body.query} {describeVar} label={t('body.query')} onchange={(v) => (body.query = v)} />
-    </div>
-    <p class="muted small">{t('body.variables')}</p>
-    <div class="code small-code">
-      <CodeEditor value={body.variables} lang="json" {describeVar} label={t('body.variables')} onchange={(v) => (body.variables = v)} />
+    <div class="graphql">
+      <section>
+        <span class="label">{t('body.query')}</span>
+        <div class="code">
+          <CodeEditor value={body.query} {describeVar} label={t('body.query')} onchange={(v) => (body.query = v)} />
+        </div>
+      </section>
+      <section>
+        <span class="label">{t('body.variables')}</span>
+        <div class="code">
+          <CodeEditor value={body.variables} lang="json" {describeVar} label={t('body.variables')} onchange={(v) => (body.variables = v)} />
+        </div>
+      </section>
     </div>
   {/if}
 </div>
@@ -123,7 +132,9 @@
   .modes label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
   .lang { padding: 2px 6px; }
   .code { flex: 1; min-height: 120px; }
-  .small-code { flex: none; height: 90px; }
+  .graphql { flex: 1; min-height: 140px; display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+  .graphql section { display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: 0; }
+  .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
   .check { width: 28px; }
   .del { width: 32px; text-align: right; }
   .file { display: flex; gap: 6px; align-items: center; }

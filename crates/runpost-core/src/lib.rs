@@ -4,6 +4,7 @@ use std::{ffi::OsString, path::PathBuf};
 include!(concat!(env!("OUT_DIR"), "/app.rs"));
 
 pub mod budget;
+pub mod codegen;
 pub mod diff;
 pub mod engine;
 pub mod error;

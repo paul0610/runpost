@@ -22,6 +22,8 @@ pub struct GetRequest {
     pub request: String,
     /// Default: method,url,params,headers,body. Also: auth,scripts,settings,description
     pub fields: Option<Vec<String>>,
+    /// Instead of fields: code in curl, fetch, powershell or python (secrets as {{name}})
+    pub snippet: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]

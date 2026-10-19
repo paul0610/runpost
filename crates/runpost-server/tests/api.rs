@@ -663,6 +663,77 @@ async fn runner_events(socket: &mut Socket, run_id: &str) -> Vec<Value> {
     }
 }
 
+/// Snippets (fase 4): variables del entorno activo, auth heredada de la colección y secretos como
+/// `{{nombre}}`, para una petición guardada y para un borrador.
+#[tokio::test]
+async fn codegen_snippets_resolve_variables_and_keep_secrets() {
+    let api = Api::start().await;
+    let mut env = api
+        .ok(Method::POST, "/environments", Some(json!({"name": "DEV"})))
+        .await;
+    let env_id = env["id"].as_str().unwrap().to_owned();
+    env["variables"] = json!([{"key": "base", "value": "https://api.test"},
+                              {"key": "token", "value": "s3cr3t-T0ken", "secret": true}]);
+    api.ok(Method::PUT, &format!("/environments/{env_id}"), Some(env))
+        .await;
+    let mut settings = api.ok(Method::GET, "/settings", None).await;
+    settings["active_environment"] = json!(env_id);
+    api.ok(Method::PUT, "/settings", Some(settings)).await;
+
+    let collection_id = collection_with(&api, "Snip", &[("Items", "{{base}}/items".into())]).await;
+    let mut collection = api
+        .ok(Method::GET, &format!("/collections/{collection_id}"), None)
+        .await;
+    collection["auth"] = json!({"type": "bearer", "token": "{{token}}"});
+    let request_id = collection["items"][0]["id"].as_str().unwrap().to_owned();
+    api.ok(
+        Method::PUT,
+        &format!("/collections/{collection_id}"),
+        Some(collection),
+    )
+    .await;
+
+    let saved = api
+        .ok(
+            Method::POST,
+            "/codegen/python",
+            Some(json!({"request": {"request_id": request_id}})),
+        )
+        .await;
+    assert_eq!(saved["lang"], "python");
+    let code = saved["code"].as_str().unwrap();
+    assert!(code.contains(r#"url = "https://api.test/items""#), "{code}");
+    assert!(
+        code.contains(r#""Authorization": "Bearer {{token}}""#),
+        "{code}"
+    );
+    assert!(!code.contains("s3cr3t"));
+
+    let draft = api
+        .ok(
+            Method::POST,
+            "/codegen/curl",
+            Some(json!({"request": {"method": "post", "url": "{{base}}/x",
+                "body": {"mode": "raw", "lang": "json", "text": "{}"},
+                "collection_id": collection_id}})),
+        )
+        .await;
+    assert_eq!(
+        draft["code"],
+        "curl --location --request POST 'https://api.test/x' \\\n--header 'Authorization: Bearer {{token}}' \\\n--header 'Content-Type: application/json' \\\n--data-raw '{}'"
+    );
+
+    let (status, error) = api
+        .call(
+            Method::POST,
+            "/codegen/go",
+            Some(json!({"request": {"request_id": "x"}})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{error}");
+    api.server.shutdown().await.unwrap();
+}
+
 async fn collection_with(api: &Api, name: &str, requests: &[(&str, String)]) -> String {
     let collection = api
         .ok(Method::POST, "/collections", Some(json!({"name": name})))
