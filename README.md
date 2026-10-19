@@ -122,6 +122,7 @@ config with your paths. Examples: [docs/mcp-client-configs/](docs/mcp-client-con
 - Auth: bearer, basic, API key, digest and OAuth 2.0 (client credentials, and authorization code
   with PKCE and a local callback). Tokens stay in memory or the OS keyring, never in files
   ([details](docs/AUTH.md)).
+- Cookie manager and client certificates per host for mutual TLS ([details](docs/NETWORK.md)).
 - `pm.*` pre-request and test scripts (QuickJS sandbox), Collection Runner with CSV/JSON data and
   JUnit/HTML reports — also from the terminal (`runpost_mcp run`).
 - MCP server (stdio, or Streamable HTTP when the app is open) with 13 compact tools: refer to saved

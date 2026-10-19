@@ -116,6 +116,8 @@
         {t(item.label)}{#if badge}<span class="n">{badge}</span>{/if}
       </button>
     {/each}
+    <span class="spacer"></span>
+    <button class="ghost cookies-link" onclick={() => (store.ui.cookiesOpen = true)}>{t('cookies.open')}</button>
   </div>
 
   <div class="pane">
@@ -215,6 +217,7 @@
   .snippet { font-family: var(--mono, monospace); font-size: 12px; font-weight: 700; }
   .snippet.on { color: var(--accent); }
   .subtabs { margin-top: 10px; flex: none; }
+  .cookies-link { color: var(--accent-text); font-size: 12px; padding: 4px 8px; }
   .pane { flex: 1; min-height: 0; overflow: auto; padding: 10px 0; }
   .scripts { display: flex; flex-direction: column; height: 100%; gap: 8px; }
   .scripts .subtabs.small { margin-top: 0; align-items: center; }

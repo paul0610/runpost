@@ -699,6 +699,7 @@ fn send_native(host: &ScriptHost, deadline: Instant, options: &str) -> String {
                 follow_redirects: true,
                 max_redirects: 10,
                 proxy: None,
+                identity: None,
             },
             digest: None,
         };

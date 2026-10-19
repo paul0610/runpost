@@ -18,6 +18,7 @@
   import SettingsDialog from './lib/components/SettingsDialog.svelte';
   import AboutDialog from './lib/components/AboutDialog.svelte';
   import ImportDialog from './lib/components/ImportDialog.svelte';
+  import CookiesDialog from './lib/components/CookiesDialog.svelte';
   import Dialogs from './lib/components/Dialogs.svelte';
   import ContextMenu from './lib/components/ContextMenu.svelte';
   import Toasts from './lib/components/Toasts.svelte';
@@ -126,6 +127,7 @@
   {#if store.ui.settings}<SettingsDialog />{/if}
   {#if store.ui.about}<AboutDialog />{/if}
   {#if store.ui.importOpen}<ImportDialog />{/if}
+  {#if store.ui.cookiesOpen}<CookiesDialog />{/if}
   <Dialogs />
   <ContextMenu />
   <Toasts />

@@ -170,6 +170,10 @@ pub(crate) fn routes() -> Router<AppState> {
         .route("/globals", get(get_globals).put(put_globals))
         .route("/send", post(send))
         .route("/codegen/{lang}", post(codegen))
+        .route(
+            "/cookies",
+            get(list_cookies).put(put_cookie).delete(delete_cookies),
+        )
         .route("/oauth2", post(oauth2))
         .route("/oauth2/flows/{id}", get(oauth2_flow))
         .route("/history", get(list_history).delete(clear_history))
@@ -523,6 +527,49 @@ async fn codegen(
         }
     };
     ok(json!({"lang": lang.as_str(), "code": code}))
+}
+
+// ---- cookies ("Gestionar cookies") ----
+
+async fn list_cookies(State(state): State<AppState>) -> ApiResult {
+    ok(json!({"cookies": state.executor.cookies().list()}))
+}
+
+#[derive(Deserialize)]
+struct CookieBody {
+    domain: String,
+    /// Texto `Set-Cookie`: `sid=abc; Path=/; HttpOnly`.
+    cookie: String,
+}
+
+/// Añade o sustituye una cookie (mismo dominio, ruta y nombre).
+async fn put_cookie(State(state): State<AppState>, Body(body): Body<CookieBody>) -> ApiResult {
+    let jar = state.executor.cookies();
+    jar.set(&body.domain, &body.cookie)?;
+    ok(json!({"cookies": jar.list()}))
+}
+
+#[derive(Deserialize)]
+struct CookieQuery {
+    domain: Option<String>,
+    path: Option<String>,
+    name: Option<String>,
+}
+
+/// Una cookie (`domain`, `path` y `name`), las de un dominio o todas.
+async fn delete_cookies(State(state): State<AppState>, Query(q): Query<CookieQuery>) -> ApiResult {
+    let jar = state.executor.cookies();
+    let removed = match (q.domain.as_deref(), q.path.as_deref(), q.name.as_deref()) {
+        (Some(domain), Some(path), Some(name)) => usize::from(jar.remove(domain, path, name)),
+        (Some(domain), None, None) => jar.clear(Some(domain)),
+        (None, None, None) => jar.clear(None),
+        _ => {
+            return Err(ApiError::bad_request(
+                "give domain, path and name (one cookie), only domain, or nothing (all)",
+            ));
+        }
+    };
+    ok(json!({"removed": removed, "cookies": jar.list()}))
 }
 
 // ---- OAuth 2.0 ----

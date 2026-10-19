@@ -1,6 +1,7 @@
 //! Motor HTTP: de `Request` (nativo) a petición real con `reqwest`, y de vuelta a `Response`.
 
 pub mod auth;
+pub mod cookies;
 pub mod digest;
 pub mod oauth;
 
@@ -12,14 +13,16 @@ use std::{
 
 use anyhow::{Context, Result};
 use bytes::Bytes;
-use reqwest::{Method, cookie::Jar, redirect};
+use reqwest::{Method, redirect};
 use serde::Serialize;
 
 use crate::{
     error::CoreError,
-    model::{Auth, Body, FieldKind, HttpSettings, RawLang, Request},
+    model::{Auth, Body, ClientCert, FieldKind, HttpSettings, RawLang, Request},
     vars::{Masker, Resolver},
 };
+
+use cookies::Cookies;
 
 pub type Headers = Vec<(String, String)>;
 
@@ -57,6 +60,8 @@ pub struct ClientKey {
     pub follow_redirects: bool,
     pub max_redirects: usize,
     pub proxy: Option<String>,
+    /// Certificado de cliente del host de la petición (TLS mutuo).
+    pub identity: Option<ClientCert>,
 }
 
 /// Lo que se envió, con secretos enmascarados: apto para UI, historial y MCP.
@@ -333,6 +338,17 @@ pub fn build_request(
         headers.push(("User-Agent".into(), http.user_agent.clone()));
     }
 
+    // Certificado de cliente: el primero de los ajustes que vale para el host (solo HTTPS).
+    let identity = match (url.scheme(), url.host_str()) {
+        ("https", Some(host)) => {
+            let port = url.port_or_known_default().unwrap_or(443);
+            http.certificates
+                .iter()
+                .find(|cert| cert.matches(host, port))
+                .cloned()
+        }
+        _ => None,
+    };
     let timeout_ms = request.settings.timeout_ms.unwrap_or(http.timeout_ms);
     let follow_redirects = request
         .settings
@@ -363,28 +379,52 @@ pub fn build_request(
             follow_redirects,
             max_redirects: http.max_redirects,
             proxy: http.proxy.clone().filter(|p| !p.trim().is_empty()),
+            identity,
         },
         digest,
     };
     Ok((prepared, resolved, masker))
 }
 
-/// Un `reqwest::Client` por combinación de opciones, todos con el mismo tarro de cookies.
+/// Un `reqwest::Client` por combinación de opciones (y certificado de cliente), todos con el mismo
+/// tarro de cookies.
+#[derive(Default)]
 pub struct Clients {
     cache: Mutex<HashMap<ClientKey, reqwest::Client>>,
-    jar: Arc<Jar>,
+    cookies: Arc<Cookies>,
 }
 
-impl Default for Clients {
-    fn default() -> Self {
-        Self {
-            cache: Mutex::new(HashMap::new()),
-            jar: Arc::new(Jar::default()),
-        }
+/// Certificado y clave PEM de los ajustes, leídos al crear el cliente.
+fn identity(cert: &ClientCert) -> Result<reqwest::Identity> {
+    let read = |path: &str, what: &str| {
+        std::fs::read(path).map_err(|error| {
+            CoreError::InvalidRequest(format!(
+                "client certificate for {}: cannot read the {what} {path}: {error}",
+                cert.host
+            ))
+        })
+    };
+    let mut pem = read(&cert.cert, "certificate")?;
+    // Un PEM con certificado y clave juntos (p. ej. convertido de PFX) se lee una vez.
+    if cert.key != cert.cert {
+        pem.push(b'\n');
+        pem.extend(read(&cert.key, "key")?);
     }
+    reqwest::Identity::from_pem(&pem).map_err(|error| {
+        CoreError::InvalidRequest(format!(
+            "client certificate for {}: {error} (it needs a PEM certificate and an unencrypted PKCS#8, RSA or EC key)",
+            cert.host
+        ))
+        .into()
+    })
 }
 
 impl Clients {
+    /// El tarro de cookies que comparten todos los clientes ("Gestionar cookies").
+    pub fn cookies(&self) -> &Arc<Cookies> {
+        &self.cookies
+    }
+
     pub fn get(&self, key: &ClientKey) -> Result<reqwest::Client> {
         let mut cache = self
             .cache
@@ -394,7 +434,7 @@ impl Clients {
             return Ok(client.clone());
         }
         let mut builder = reqwest::Client::builder()
-            .cookie_provider(self.jar.clone())
+            .cookie_provider(self.cookies.clone())
             .gzip(true)
             .brotli(true)
             .redirect(if key.follow_redirects {
@@ -410,6 +450,9 @@ impl Clients {
             // Sin proxy en settings no se usa ninguno (tampoco HTTP_PROXY del entorno).
             None => builder.no_proxy(),
         };
+        if let Some(cert) = &key.identity {
+            builder = builder.identity(identity(cert)?);
+        }
         let client = builder.build().context("cannot build HTTP client")?;
         cache.insert(key.clone(), client.clone());
         Ok(client)

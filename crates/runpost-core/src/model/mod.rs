@@ -571,6 +571,36 @@ pub enum Theme {
     System,
 }
 
+/// Certificado de cliente (TLS mutuo) para un host (sección 18, fase 4). Son rutas a archivos PEM:
+/// los ajustes guardan la ruta, nunca la clave.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ClientCert {
+    /// `api.example.com`, o `*.example.com` para sus subdominios.
+    pub host: String,
+    /// Sin puerto vale para cualquiera.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    /// Certificado PEM, con la cadena intermedia si la hay.
+    pub cert: String,
+    /// Clave privada PEM sin cifrar (PKCS#8, RSA o EC).
+    pub key: String,
+}
+
+impl ClientCert {
+    /// ¿Vale para `host:port`? Sin distinguir mayúsculas; `*.` no cubre el dominio base.
+    pub fn matches(&self, host: &str, port: u16) -> bool {
+        if self.port.is_some_and(|p| p != port) {
+            return false;
+        }
+        let pattern = self.host.trim().trim_end_matches('.').to_ascii_lowercase();
+        let host = host.trim_end_matches('.').to_ascii_lowercase();
+        match pattern.strip_prefix("*.") {
+            Some(domain) => host.ends_with(&format!(".{domain}")),
+            None => !pattern.is_empty() && host == pattern,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct HttpSettings {
@@ -580,6 +610,9 @@ pub struct HttpSettings {
     pub max_redirects: usize,
     pub proxy: Option<String>,
     pub user_agent: String,
+    /// Certificados de cliente por host (el primero que coincide).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub certificates: Vec<ClientCert>,
 }
 
 impl Default for HttpSettings {
@@ -591,6 +624,7 @@ impl Default for HttpSettings {
             max_redirects: 10,
             proxy: None,
             user_agent: format!("{}/0.1", crate::APP_SLUG),
+            certificates: Vec::new(),
         }
     }
 }
@@ -806,6 +840,32 @@ mod tests {
         let full = serde_json::to_value(Settings::default()).unwrap();
         assert_eq!(full["http"]["user_agent"], "runpost/0.1");
         assert_eq!(full["active_environment"], serde_json::Value::Null);
+    }
+
+    #[test]
+    fn client_certificates_match_host_port_and_wildcards() {
+        let cert = |host: &str, port: Option<u16>| ClientCert {
+            host: host.into(),
+            port,
+            cert: "c.pem".into(),
+            key: "k.pem".into(),
+        };
+        assert!(cert("api.acme.test", None).matches("API.acme.test", 443));
+        assert!(cert("api.acme.test", Some(8443)).matches("api.acme.test", 8443));
+        assert!(!cert("api.acme.test", Some(8443)).matches("api.acme.test", 443));
+        assert!(cert("*.acme.test", None).matches("a.b.acme.test", 443));
+        assert!(!cert("*.acme.test", None).matches("acme.test", 443));
+        assert!(!cert("*.acme.test", None).matches("evilacme.test", 443));
+        assert!(!cert("", None).matches("", 443));
+        let settings: Settings = serde_json::from_value(json!({"http": {"certificates": [
+            {"host": "api.acme.test", "cert": "C:/certs/client.pem", "key": "C:/certs/client.key"}]}}))
+        .unwrap();
+        assert_eq!(settings.http.certificates.len(), 1);
+        assert!(
+            !serde_json::to_string(&Settings::default())
+                .unwrap()
+                .contains("certificates")
+        );
     }
 
     #[test]

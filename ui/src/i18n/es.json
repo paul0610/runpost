@@ -529,5 +529,35 @@
     "copyFailed": "No se pudo usar el portapapeles: selecciona el código y cópialo.",
     "close": "Cerrar",
     "note": "Las variables normales se sustituyen; los secretos quedan como {{variable}}."
+  },
+  "cookies": {
+    "open": "Cookies",
+    "title": "Gestionar cookies",
+    "hint": "Las cookies que recibió la app o que añadas aquí. Van con las peticiones a su dominio y viven en memoria mientras la app está abierta: no se guardan en el workspace.",
+    "filter": "Filtrar por dominio",
+    "empty": "Aún no hay cookies.",
+    "noMatch": "Ningún dominio coincide.",
+    "deleteDomain": "Borrar todas",
+    "delete": "Borrar cookie",
+    "session": "sesión",
+    "subdomains": "subdominios",
+    "addTitle": "Añadir una cookie",
+    "editTitle": "Editar cookie",
+    "domain": "Dominio",
+    "raw": "Cookie (texto Set-Cookie)",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar"
+  },
+  "certs": {
+    "title": "Certificados de cliente",
+    "hint": "Para APIs con TLS mutuo. El certificado y su clave son archivos PEM (la clave sin cifrar) y solo van al host que coincide. Para convertir un PFX: openssl pkcs12 -in client.pfx -out client.pem -nodes",
+    "host": "Host",
+    "port": "Puerto (opcional)",
+    "cert": "Certificado (PEM)",
+    "key": "Clave (PEM)",
+    "choose": "Elegir…",
+    "add": "Añadir certificado",
+    "remove": "Quitar certificado"
   }
 }

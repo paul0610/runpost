@@ -1166,3 +1166,76 @@ async fn oauth2_tokens_from_the_api() {
     assert!(!sent.to_string().contains("fake-user-token"));
     api.server.shutdown().await.unwrap();
 }
+
+#[tokio::test]
+async fn cookie_manager() {
+    let api = Api::start().await;
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/login"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("set-cookie", "sid=fake-session; Path=/; HttpOnly"),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/me"))
+        .and(wiremock::matchers::header_regex(
+            "cookie",
+            "sid=fake-session",
+        ))
+        .and(wiremock::matchers::header_regex("cookie", "theme=dark"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("me"))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let send = |path: &str| json!({"request": {"method": "GET", "url": format!("{}{path}", server.uri())}});
+    api.ok(Method::POST, "/send", Some(send("/login"))).await;
+
+    let listed = api.ok(Method::GET, "/cookies", None).await;
+    let cookies = listed["cookies"].as_array().unwrap();
+    assert_eq!(cookies.len(), 1, "{listed}");
+    assert_eq!(cookies[0]["domain"], "127.0.0.1");
+    assert_eq!(cookies[0]["name"], "sid");
+    assert_eq!(cookies[0]["http_only"], true);
+    assert_eq!(cookies[0]["host_only"], true);
+
+    // Añadida a mano desde el gestor: viaja con la siguiente petición.
+    let added = api
+        .ok(
+            Method::PUT,
+            "/cookies",
+            Some(json!({"domain": "127.0.0.1", "cookie": "theme=dark; Path=/"})),
+        )
+        .await;
+    assert_eq!(added["cookies"].as_array().unwrap().len(), 2);
+    let me = api.ok(Method::POST, "/send", Some(send("/me"))).await;
+    assert_eq!(me["response"]["status"], 200, "{me}");
+    server.verify().await;
+
+    let (status, bad) = api
+        .call(
+            Method::PUT,
+            "/cookies",
+            Some(json!({"domain": "https://127.0.0.1", "cookie": "a=1"})),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{bad}");
+
+    let removed = api
+        .ok(
+            Method::DELETE,
+            "/cookies?domain=127.0.0.1&path=/&name=sid",
+            None,
+        )
+        .await;
+    assert_eq!(removed["removed"], 1);
+    assert_eq!(removed["cookies"].as_array().unwrap().len(), 1);
+    let (status, _) = api.call(Method::DELETE, "/cookies?path=/", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let cleared = api.ok(Method::DELETE, "/cookies", None).await;
+    assert_eq!(cleared["removed"], 1);
+    assert!(cleared["cookies"].as_array().unwrap().is_empty());
+    api.server.shutdown().await.unwrap();
+}

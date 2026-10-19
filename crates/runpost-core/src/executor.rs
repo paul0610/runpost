@@ -372,7 +372,13 @@ impl Executor {
             follow_redirects: http.follow_redirects,
             max_redirects: http.max_redirects,
             proxy: http.proxy.clone().filter(|p| !p.trim().is_empty()),
+            identity: None,
         })
+    }
+
+    /// Las cookies de las peticiones de este proceso ("Gestionar cookies").
+    pub fn cookies(&self) -> &Arc<engine::cookies::Cookies> {
+        self.clients.cookies()
     }
 
     /// Ejecuta `req`. Si su id pertenece a una colección del workspace, usa sus variables, la auth

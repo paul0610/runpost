@@ -971,3 +971,20 @@ describe('OAuth 2.0 (fase 4)', () => {
     expect(calls.at(-1)).toMatchObject({ method: 'GET', path: '/oauth2/flows/f1' });
   });
 });
+
+describe('cookies (fase 4)', () => {
+  it('lista, guarda y borra con la API del tarro', async () => {
+    const cookie = { domain: 'api.acme.test', host_only: true, path: '/', name: 'sid', value: 'x', expires: null, secure: false, http_only: true, raw: 'sid=x; Path=/' };
+    responses['GET /cookies'] = { cookies: [cookie] };
+    responses['PUT /cookies'] = { cookies: [cookie] };
+    expect(await store.listCookies()).toEqual([cookie]);
+    await store.saveCookie('api.acme.test', 'sid=x; Path=/');
+    expect(calls.at(-1)).toMatchObject({ method: 'PUT', path: '/cookies', body: { domain: 'api.acme.test', cookie: 'sid=x; Path=/' } });
+    responses['DELETE /cookies?domain=api.acme.test&path=%2F&name=sid'] = { cookies: [] };
+    expect(await store.deleteCookies('api.acme.test', '/', 'sid')).toEqual([]);
+    expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/cookies?domain=api.acme.test&path=%2F&name=sid' });
+    responses['DELETE /cookies'] = { cookies: [] };
+    await store.deleteCookies();
+    expect(calls.at(-1)).toMatchObject({ method: 'DELETE', path: '/cookies' });
+  });
+});

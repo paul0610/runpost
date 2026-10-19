@@ -502,6 +502,23 @@ async function s8() {
       [...document.querySelectorAll('.subtabs [role=tab]')].find(b => b.textContent.startsWith('Auth')).click(); await wait(800);
       document.querySelector('.auth .fields').scrollIntoView({ block: 'start' }); await wait(200);`);
     await shot(`app-oauth-code-${theme}.png`);
+    // Gestionar cookies: dos cookies de ejemplo (una de dominio) y una en edición.
+    await api('/cookies', { domain: 'api.acme.test', cookie: 'session=fake-session-id; Path=/; HttpOnly; Secure' });
+    await api('/cookies', { domain: 'acme.test', cookie: 'theme=dark; Domain=acme.test; Path=/; Max-Age=86400' });
+    await evaluate(`document.querySelector('.cookies-link').click(); await wait(700);
+      document.querySelector('.cookie .name').click(); await wait(300);`);
+    await shot(`app-cookies-${theme}.png`);
+    await evaluate(`document.querySelector('.dialog header button').click(); await wait(200);`);
+    // Ajustes > Certificados de cliente, con uno guardado.
+    const settings = await api('/settings');
+    settings.http.certificates = [{ host: 'api.acme.test', port: 8443, cert: 'C:/certs/acme-client.crt', key: 'C:/certs/acme-client.key' }];
+    await api('/settings', settings);
+    await evaluate(`[...document.querySelectorAll('button')].find(b => b.title.startsWith('Ajustes')).click(); await wait(500);
+      [...document.querySelectorAll('.dialog button.advanced')].at(-1).click(); await wait(300);
+      document.querySelector('.cert-form').scrollIntoView({ block: 'end' }); await wait(200);`);
+    await shot(`app-certs-${theme}.png`);
+    settings.http.certificates = [];
+    await api('/settings', settings);
   }
 }
 

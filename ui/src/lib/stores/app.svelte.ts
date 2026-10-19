@@ -10,6 +10,7 @@ import type {
   Approval,
   Collection,
   CollectionSummary,
+  CookieInfo,
   Environment,
   Globals,
   HistoryEntry,
@@ -311,6 +312,8 @@ class AppStore {
     about: false,
     /** Diálogo Importar (fase 4): pegar texto o elegir archivos. */
     importOpen: false,
+    /** Diálogo "Gestionar cookies" (fase 4). */
+    cookiesOpen: false,
     /** Panel "Código" (snippets) a la derecha del editor, como en Postman. */
     code: false,
     codeLang: 'curl' as SnippetLang,
@@ -1318,6 +1321,28 @@ class AppStore {
       env_id: this.settings?.active_environment ?? null,
       action,
     });
+  }
+
+  /** Cookies del tarro de la app ("Gestionar cookies"). */
+  async listCookies(): Promise<CookieInfo[]> {
+    return (await api.get<{ cookies: CookieInfo[] }>('/cookies')).cookies;
+  }
+
+  /** Añade o sustituye una cookie desde su texto Set-Cookie. */
+  async saveCookie(domain: string, cookie: string): Promise<CookieInfo[]> {
+    return (await api.put<{ cookies: CookieInfo[] }>('/cookies', { domain, cookie })).cookies;
+  }
+
+  /** Una cookie (dominio, ruta y nombre), las de un dominio o todas. */
+  async deleteCookies(domain?: string, path?: string, name?: string): Promise<CookieInfo[]> {
+    const params = new URLSearchParams();
+    if (domain) params.set('domain', domain);
+    if (domain && path !== undefined && name !== undefined) {
+      params.set('path', path);
+      params.set('name', name);
+    }
+    const query = params.toString();
+    return (await api.del<{ cookies: CookieInfo[] }>(`/cookies${query ? `?${query}` : ''}`)).cookies;
   }
 
   async oauthWait(flow: string): Promise<OAuthToken> {

@@ -39,6 +39,30 @@ export type Auth =
       client_auth?: ClientAuth;
     };
 
+/** Certificado de cliente (PEM) para un host: `api.example.com` o `*.example.com`. */
+export interface ClientCert {
+  host: string;
+  port?: number | null;
+  cert: string;
+  key: string;
+}
+
+/** Una cookie del tarro de la app ("Gestionar cookies"). */
+export interface CookieInfo {
+  domain: string;
+  /** Sin atributo Domain: solo ese host. */
+  host_only: boolean;
+  path: string;
+  name: string;
+  value: string;
+  /** Segundos Unix; `null` = cookie de sesión. */
+  expires: number | null;
+  secure: boolean;
+  http_only: boolean;
+  /** Texto Set-Cookie para editarla. */
+  raw: string;
+}
+
 /** Cómo se presenta el cliente OAuth 2.0 al pedir el token. */
 export type ClientAuth = 'basic' | 'body';
 
@@ -160,6 +184,8 @@ export interface Settings {
     max_redirects: number;
     proxy: string | null;
     user_agent: string;
+    /** Certificados de cliente por host (TLS mutuo). */
+    certificates?: ClientCert[];
   };
   mcp: { body_max_chars: number; headers_default: boolean; mask_secrets: boolean; cache_responses: number };
   ui: { font_size: number; wrap_response: boolean; lang: string };

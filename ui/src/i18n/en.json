@@ -529,5 +529,35 @@
     "copyFailed": "Could not use the clipboard: select the code and copy it.",
     "close": "Close",
     "note": "Plain variables are replaced; secrets stay as {{variable}}."
+  },
+  "cookies": {
+    "open": "Cookies",
+    "title": "Manage cookies",
+    "hint": "Cookies the app received, or that you add here. They go with the requests to their domain and live in memory while the app is open: they are not saved in the workspace.",
+    "filter": "Filter by domain",
+    "empty": "No cookies yet.",
+    "noMatch": "No domain matches.",
+    "deleteDomain": "Delete all",
+    "delete": "Delete cookie",
+    "session": "session",
+    "subdomains": "subdomains",
+    "addTitle": "Add a cookie",
+    "editTitle": "Edit cookie",
+    "domain": "Domain",
+    "raw": "Cookie (Set-Cookie text)",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "certs": {
+    "title": "Client certificates",
+    "hint": "For APIs with mutual TLS. The certificate and its key are PEM files (the key unencrypted) and go only to the matching host. To convert a PFX file: openssl pkcs12 -in client.pfx -out client.pem -nodes",
+    "host": "Host",
+    "port": "Port (optional)",
+    "cert": "Certificate (PEM)",
+    "key": "Key (PEM)",
+    "choose": "Choose…",
+    "add": "Add certificate",
+    "remove": "Remove certificate"
   }
 }

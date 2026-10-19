@@ -125,6 +125,14 @@ de otras plataformas. No se borraron dependencias para ocultar hallazgos.
   no tiene MD5 en su API segura. Solo depende de `digest` 0.11 y `cfg-if`, que ya estaban. La suma de
   `Cargo.lock` coincide con la que publica crates.io.
 
+- `cookie` 0.18.2 y `cookie_store` 0.22.1 pasan a dependencias directas para el gestor de cookies.
+  Son las mismas versiones y features que ya traía `reqwest` (`cookies`): `Cargo.lock` no cambia.
+- Solo para las pruebas de TLS mutuo: `rcgen` 0.14.10 (`aws_lc_rs` y `pem`, sin features por
+  defecto) genera la CA y los certificados en la prueba, y `rustls` 0.23.46 y `tokio-rustls` 0.26.6
+  (las versiones del árbol) montan el servidor. `rcgen` añade `yasna` 0.6.0, `pem` 4.0.0 y
+  `bit-vec` 0.9.1 a las pruebas. El lock anota además las opcionales de `rcgen` (`x509-parser` y su
+  familia ASN.1), que no se compilan (`cargo tree -i x509-parser` no muestra nada).
+
 Consulta del 2026-10-18 en crates.io y OSV: todas las versiones superan los siete días y no tienen
 avisos. SHA-256 y SHA-512-256 (digest, PKCE de OAuth 2.0 y los ids estables de las importaciones)
 usan `aws-lc-rs`, que ya estaba.

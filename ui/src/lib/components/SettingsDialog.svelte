@@ -2,12 +2,34 @@
   // Ajustes en una sola página (P6): lo visible siempre arriba; el resto, plegado en "Avanzado".
   import { store } from '../stores/app.svelte';
   import { t } from '../i18n.svelte';
-  import { revealWorkspace } from '../native';
+  import { pickFiles, revealWorkspace } from '../native';
   import { isTauri } from '../transport';
-  import type { Settings, ThemeMode } from '../types';
+  import type { ClientCert, Settings, ThemeMode } from '../types';
 
   const settings = $derived(store.settings);
   let advanced = $state(false);
+  // Certificados de cliente (fase 4): rutas a los PEM; la clave nunca se copia.
+  let certsOpen = $state(false);
+  let cert = $state<ClientCert>({ host: '', port: null, cert: '', key: '' });
+  const certs = $derived(settings?.http.certificates ?? []);
+  const certReady = $derived(cert.host.trim() !== '' && cert.cert.trim() !== '' && cert.key.trim() !== '');
+
+  async function pick(field: 'cert' | 'key'): Promise<void> {
+    const picked = await pickFiles([{ name: 'PEM', extensions: ['pem', 'crt', 'cer', 'key'] }], false);
+    if (picked?.kind === 'paths' && picked.paths[0]) cert[field] = picked.paths[0];
+  }
+
+  function addCert(): void {
+    if (!certReady) return;
+    const added: ClientCert = { host: cert.host.trim(), cert: cert.cert.trim(), key: cert.key.trim() };
+    if (cert.port) added.port = cert.port;
+    update((s) => (s.http.certificates = [...(s.http.certificates ?? []), added]));
+    cert = { host: '', port: null, cert: '', key: '' };
+  }
+
+  function removeCert(index: number): void {
+    update((s) => (s.http.certificates = (s.http.certificates ?? []).filter((_, i) => i !== index)));
+  }
 
   function update(change: (s: Settings) => void): void {
     void store.updateSettings(change);
@@ -111,6 +133,43 @@
           <input id="s-cache" type="number" min="0" value={settings.mcp.cache_responses} onchange={(e) => update((s) => (s.mcp.cache_responses = Math.max(0, Number.parseInt(e.currentTarget.value, 10) || 0)))} />
         </div>
       {/if}
+
+      <button class="advanced ghost" aria-expanded={certsOpen} onclick={() => (certsOpen = !certsOpen)}>
+        {certsOpen ? '▾' : '▸'} {t('certs.title')}{certs.length ? ` (${certs.length})` : ''}
+      </button>
+      {#if certsOpen}
+        <p class="muted small hint">{t('certs.hint')}</p>
+        {#each certs as item, i (i)}
+          <div class="cert">
+            <span class="mono host">{item.host}{item.port ? `:${item.port}` : ''}</span>
+            <span class="muted small path" title={item.cert}>{item.cert}</span>
+            <span class="muted small path" title={item.key}>{item.key}</span>
+            <button class="icon ghost" aria-label={t('certs.remove')} title={t('certs.remove')} onclick={() => removeCert(i)}>×</button>
+          </div>
+        {/each}
+        <div class="cert-form">
+          <label><span>{t('certs.host')}</span><input class="mono" bind:value={cert.host} placeholder="api.example.com" spellcheck="false" /></label>
+          <label>
+            <span>{t('certs.port')}</span>
+            <input type="number" min="1" max="65535" value={cert.port ?? ''} onchange={(e) => (cert.port = Number.parseInt(e.currentTarget.value, 10) || null)} />
+          </label>
+          <label class="wide">
+            <span>{t('certs.cert')}</span>
+            <span class="pick">
+              <input class="mono" bind:value={cert.cert} placeholder="C:\certs\client.crt" spellcheck="false" />
+              {#if isTauri()}<button onclick={() => pick('cert')}>{t('certs.choose')}</button>{/if}
+            </span>
+          </label>
+          <label class="wide">
+            <span>{t('certs.key')}</span>
+            <span class="pick">
+              <input class="mono" bind:value={cert.key} placeholder="C:\certs\client.key" spellcheck="false" />
+              {#if isTauri()}<button onclick={() => pick('key')}>{t('certs.choose')}</button>{/if}
+            </span>
+          </label>
+          <div class="wide add"><button class="primary" disabled={!certReady} onclick={addCert}>{t('certs.add')}</button></div>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
@@ -125,9 +184,20 @@
   .grid input[type="number"] { width: 110px; }
   .ws { display: flex; gap: 8px; align-items: center; min-width: 0; }
   .ws code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .advanced { margin: 16px 0 8px; padding-left: 0; font-weight: 600; }
+  .advanced { display: block; margin: 16px 0 8px; padding-left: 0; font-weight: 600; }
   .about-row { margin-top: 12px; }
   .link { padding-left: 0; color: var(--accent-text); text-decoration: underline; }
   .warn { color: var(--warn); margin: 4px 0 0; font-size: 12px; }
   .small { font-size: 12px; }
+  .hint { margin: 0 0 8px; line-height: 1.5; }
+  .cert { display: grid; grid-template-columns: 160px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .cert .host { overflow: hidden; text-overflow: ellipsis; }
+  .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+  .cert-form { display: grid; grid-template-columns: 1fr 140px; gap: 8px 12px; margin-top: 10px; }
+  .cert-form label { display: flex; flex-direction: column; gap: 4px; }
+  .cert-form label > span:first-child { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .cert-form .wide { grid-column: 1 / -1; }
+  .pick { display: flex; gap: 6px; }
+  .pick input { flex: 1; min-width: 0; }
+  .add { display: flex; justify-content: flex-end; }
 </style>
