@@ -1,3 +1,5 @@
+<p align="right"><b>English</b> · <a href="README.es.md">Español</a></p>
+
 <p align="center"><img src="apps/desktop/src-tauri/icons/128x128@2x.png" width="96" alt="RunPost logo"></p>
 
 <h1 align="center">RunPost</h1>
@@ -15,7 +17,6 @@ The HTTP client you and your AI agent share: a Postman-like desktop app with a b
 
 <p align="center">
   <a href="https://paul0610.github.io/runpost/">Website</a> ·
-  <a href="README.es.md">Español</a> ·
   <a href="https://github.com/paul0610/runpost/releases/latest">Download</a> ·
   <a href="docs/MCP.md">MCP tools</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>

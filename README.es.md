@@ -1,3 +1,5 @@
+<p align="right"><a href="README.md">English</a> · <b>Español</b></p>
+
 <p align="center"><img src="apps/desktop/src-tauri/icons/128x128@2x.png" width="96" alt="Logotipo de RunPost"></p>
 
 <h1 align="center">RunPost</h1>
@@ -15,7 +17,6 @@ El cliente HTTP que usan tú y tu agente de IA: una app de escritorio tipo Postm
 
 <p align="center">
   <a href="https://paul0610.github.io/runpost/es.html">Web</a> ·
-  <a href="README.md">English</a> ·
   <a href="https://github.com/paul0610/runpost/releases/latest">Descargas</a> ·
   <a href="docs/MCP.md">Tools MCP</a> ·
   <a href="CONTRIBUTING.md">Contribuir</a>
