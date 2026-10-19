@@ -52,13 +52,13 @@ Measured with the real release binaries; the token figures use the bundled examp
 
 | What | RunPost |
 |---|---|
-| Whole `tools/list` (13 tools, sent once per session) | ≈ 1,608 tokens |
-| `run_request` "00.2 Gateway - ping" | 201 characters ≈ 50 tokens |
+| Whole `tools/list` (13 tools, sent once per session) | ≈ 1,675 tokens |
+| `run_request` "00.2 Gateway - ping" | ≈ 200 characters ≈ 50 tokens |
 | `run_request` with `select` on one field | < 60 tokens |
 | A typical 5 KB JSON response | < 700 tokens (minified, truncated, rest on demand) |
 | Claude Code plugin always-on cost | ≈ 112 tokens (+ ≈ 630 when the skill fires) |
-| Desktop app on Windows 11: size, start to usable window, memory at rest | 19.1 MB, ≈ 1.1 s, ≈ 37 MB (plus the system WebView) |
-| CLI / MCP server: size, start to `initialize` | 16.4 MB, ≈ 53 ms |
+| Desktop app on Windows 11: size, start to usable window, memory at rest | 20.5 MB, 1.25–1.45 s, 35–37 MB (plus the system WebView) |
+| CLI / MCP server: size, start to `initialize` | 17.9 MB, ≈ 75 ms |
 | Full Claude Code session, curl vs RunPost | being measured: the harness is in `scripts/bench/` (see [docs/BENCH.md](docs/BENCH.md)) |
 
 ## Install
@@ -66,7 +66,9 @@ Measured with the real release binaries; the token figures use the bundled examp
 Download from [Releases](https://github.com/paul0610/runpost/releases/latest). The builds are not
 code-signed yet, so the first launch asks for confirmation.
 
-**Windows** (PowerShell; per-user install in `%LOCALAPPDATA%\RunPost`, `runpost_mcp.exe` included):
+**Windows**: download `RunPost_0.2.0_x64-setup.exe` and double-click it. It installs for your user
+in `%LOCALAPPDATA%\RunPost` (no admin), with `runpost_mcp.exe`, and adds RunPost to the Start menu.
+`RunPost_0.2.0_x64-portable.exe` runs without installing. Or, in PowerShell:
 
 ```powershell
 Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_x64-setup.exe -OutFile RunPost-setup.exe
@@ -115,7 +117,7 @@ config with your paths. Examples: [docs/mcp-client-configs/](docs/mcp-client-con
 
 - Postman-style UI: collections, folders, tabs, params/headers/body/auth editors, environments and
   globals, history, console, markdown docs, light and dark themes, Postman shortcuts. English and
-  Spanish.
+  Spanish (Settings → Language).
 - Import from Postman v2.1, OpenAPI 3, HAR, Insomnia (v4 and v5), Bruno (`.bru`, YAML or JSON) and
   cURL ([what is translated](docs/IMPORT.md)); export to Postman v2.1. Code snippets (cURL, fetch,
   PowerShell, Python) that keep secrets as `{{variables}}`, and GraphQL bodies

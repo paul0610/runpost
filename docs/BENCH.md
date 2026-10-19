@@ -1,6 +1,6 @@
 # RunPost — medidas
 
-Tokens ≈ caracteres / 4. Medido el 2026-10-18 en Windows 11 con el binario real
+Tokens ≈ caracteres / 4. Medido el 2026-10-19, con la versión 0.2.0, en Windows 11 con el binario real
 (`runpost_mcp.exe mcp`, stdio) y la colección de ejemplo importada (Acme, una API ficticia), contra
 `wiremock` con respuestas simuladas. Ninguna llamada sale a la red.
 
@@ -14,34 +14,34 @@ cargo test -p runpost-cli --test mcp_bench -- --ignored --nocapture
 
 | Métrica | Objetivo | Medido | Dónde se comprueba |
 |---|---|---|---|
-| `tools/list` completo | < 2 500 tokens | **≈ 1 608** (6 432 caracteres, 13 tools) | `mcp_tools.rs`, test unitario de `runpost-mcp` |
+| `tools/list` completo | < 2 500 tokens | **≈ 1 675** (6 700 caracteres, 13 tools; 1 608 en la 0.1.0) | `mcp_tools.rs`, test unitario de `runpost-mcp` |
 | `run_request` con `select` a un campo | < 60 tokens | **< 60** para la respuesta (`$.session.scope`, 4 valores); los `tests` y la `console` de los scripts de la petición van aparte | `mcp_tools.rs`, `budget.rs` |
 | `run_request` típico (JSON de 5 KB, sin `select`) | < 700 tokens | **< 700** (cuerpo truncado a 2 000 caracteres; el test falla si se supera) | `budget.rs` `typical_5kb_json_stays_under_700_tokens` |
-| "00.2 Gateway - ping" | < 300 bytes | **201 caracteres**, con el resultado de sus tests | `mcp_tools.rs` |
+| "00.2 Gateway - ping" | < 300 bytes | **202 caracteres**, con el resultado de sus tests | `mcp_tools.rs` |
 | Secreto en la salida MCP | nunca | 0 apariciones en la transcripción completa | `mcp_tools.rs` |
-| Arranque de la app hasta la ventana usable | < 1,5 s | **1,13 s** de mediana (1,19 s contando desde que se lanza el ejecutable) | `scripts/dev/startup_time.py` |
-| `runpost_mcp mcp` hasta responder `initialize` | < 100 ms | **53 ms** | `startup_time.py` |
-| Memoria en reposo de la app (proceso Rust, sin el webview) | < 60 MB | **37 MB** | `startup_time.py` |
-| Ejecutable de la app | < 25 MB | **19,1 MB** | `startup_time.py` |
-| Binario `runpost_mcp` | < 15 MB | **16,4 MB**: todavía no | `startup_time.py` |
+| Arranque de la app hasta la ventana usable | < 1,5 s | **1,25–1,45 s** de mediana en dos series (1,33–1,54 s contando desde que se lanza el ejecutable) | `scripts/dev/startup_time.py` |
+| `runpost_mcp mcp` hasta responder `initialize` | < 100 ms | **75–78 ms** | `startup_time.py` |
+| Memoria en reposo de la app (proceso Rust, sin el webview) | < 60 MB | **35–37 MB** | `startup_time.py` |
+| Ejecutable de la app | < 25 MB | **20,5 MB** | `startup_time.py` |
+| Binario `runpost_mcp` | < 15 MB | **17,9 MB**: todavía no | `startup_time.py` |
 
 ## Arranque, memoria y tamaño
 
-Medido el 2026-10-18 en Windows 11 (AMD Ryzen 9 6900HX, 32 GB, SSD NVMe) con los binarios release,
-un workspace temporal vacío y el llavero en memoria:
+La misma máquina en las dos versiones: Windows 11 (AMD Ryzen 9 6900HX, 32 GB, SSD NVMe), binarios
+release, un workspace temporal vacío y el llavero en memoria:
 
 ```powershell
 python scripts/dev/startup_time.py --runs 5
 ```
 
-| Medida (mín / mediana / máx) | Objetivo | Antes: `lto = "thin"` | Ahora: LTO completo y `opt-level = "s"` |
-|---|---|---|---|
-| App: del arranque del proceso a la ventana usable | < 1 500 ms | ≈ 1 400 ms de mediana | 1 111 / 1 127 / 1 279 ms |
-| App: lo mismo desde que se lanza el ejecutable | < 1 500 ms | ≈ 2 000 ms de mediana | 1 168 / 1 191 / 1 870 ms |
-| `runpost_mcp mcp` hasta responder `initialize` | < 100 ms | — | 53 / 53 / 78 ms |
-| App en reposo, memoria del proceso (sin el webview) | < 60 MB | — | 37 MB |
-| `runpost_app.exe` | < 25 MB | 33,3 MB | 19,1 MB (19,9 MB compilado junto al CLI) |
-| `runpost_mcp.exe` | < 15 MB | 28,4 MB | 16,4 MB (15,3 MB con `opt-level = "z"`) |
+| Medida (mín / mediana / máx) | Objetivo | 0.1.0 con `lto = "thin"` | 0.1.0: LTO completo y `opt-level = "s"` (2026-10-18) | 0.2.0, dos series seguidas (2026-10-19) |
+|---|---|---|---|---|
+| App: del arranque del proceso a la ventana usable | < 1 500 ms | ≈ 1 400 ms de mediana | 1 111 / 1 127 / 1 279 ms | 1 214 / 1 253 / 1 396 ms y 1 375 / 1 454 / 1 859 ms |
+| App: lo mismo desde que se lanza el ejecutable | < 1 500 ms | ≈ 2 000 ms de mediana | 1 168 / 1 191 / 1 870 ms | 1 304 / 1 330 / 1 977 ms y 1 455 / 1 537 / 2 100 ms |
+| `runpost_mcp mcp` hasta responder `initialize` | < 100 ms | — | 53 / 53 / 78 ms | 76 / 78 / 564 ms y 70 / 75 / 110 ms |
+| App en reposo, memoria del proceso (sin el webview) | < 60 MB | — | 37 MB | 37 MB y 35 MB |
+| `runpost_app.exe` | < 25 MB | 33,3 MB | 19,1 MB (19,9 MB compilado junto al CLI) | 20,5 MB |
+| `runpost_mcp.exe` | < 15 MB | 28,4 MB | 16,4 MB (15,3 MB con `opt-level = "z"`) | 17,9 MB |
 
 - "Ventana usable" es cuando la SPA ya cargada pide `backend_info`; la app lo anota si
   `RUNPOST_STARTUP_LOG` está definida. El máximo desde que se lanza el ejecutable es el primer
@@ -51,8 +51,14 @@ python scripts/dev/startup_time.py --runs 5
 - Tamaños compilando cada binario por separado (`cargo build --release -p …`), como hace el release.
   Compilados juntos con `cargo build --release`, la app también lleva la SPA embebida del modo
   navegador (unos 0,8 MB más), porque cargo unifica las características.
-- La columna "antes" del arranque es de una medida anterior del mismo día con el perfil `thin` (solo
-  la mediana); los tamaños, de `cargo build --release` con ese perfil.
+- La columna `thin` del arranque es de una medida anterior del mismo día con ese perfil (solo la
+  mediana); los tamaños, de `cargo build --release` con ese perfil.
+- Las dos series de la 0.2.0 se tomaron seguidas, con otros procesos usando ≈ 30 % de la CPU. Sus
+  medianas difieren ≈ 200 ms, más que la diferencia con la 0.1.0, así que no se puede atribuir a la
+  versión. En la segunda, contada desde que se lanza el ejecutable, la mediana pasa del objetivo de
+  1,5 s. El primer arranque de cada serie es el más lento (WebView2 y el antivirus en frío).
+- Los tamaños de la 0.2.0 son los de los archivos del release; compilados en local por separado,
+  20,5 y 17,8 MB.
 
 ## Sesión guiada de 15 llamadas (colección de ejemplo: ¿qué scope necesita cada endpoint?)
 
@@ -62,19 +68,19 @@ python scripts/dev/startup_time.py --runs 5
 | 2 | `list_requests` | `{"collection":"acme-gateway-scopes"}` | 2206 | 551 | — |
 | 3 | `env_get` | `{"keys":["gatewayUrl","accessToken","currency","accountId"]}` | 145 | 36 | — |
 | 4 | `env_set` | `{"env":"Acme DESA (fake)","vars":{"gatewayUrl":"<mock>","api…` | 45 | 11 | — |
-| 5 | `run_request` | `{"request":"00.2 Gateway - ping"}` | 201 | 50 | 116 |
+| 5 | `run_request` | `{"request":"00.2 Gateway - ping"}` | 202 | 50 | 116 |
 | 6 | `run_request` | `{"request":"00.1 API","select":"$.session.scope"}` | 396 | 99 | 601 |
 | 7 | `run_request` | `{"request":"#5 POST keys/local"}` | 377 | 94 | 292 |
 | 8 | `run_request` | `{"request":"#6 POST encrypt"}` | 377 | 94 | 292 |
 | 9 | `run_request` | `{"request":"#7 POST sign (sonda"}` | 576 | 144 | 292 |
 | 10 | `run_request` | `{"request":"#5 keys/local SIN token"}` | 409 | 102 | 168 |
 | 11 | `run_request` | `{"request":"#7 sign token INVÁLIDO"}` | 253 | 63 | 168 |
-| 12 | `get_response` | `{"response_id":"h_01a150d151e772b7b5d2e2414adf3cb7","range":…` | 274 | 68 | — |
+| 12 | `get_response` | `{"response_id":"h_01a155056fcb76b8bd09ed3a1d55a0ff","range":…` | 274 | 68 | — |
 | 13 | `history` | `{"limit":5}` | 765 | 191 | — |
 | 14 | `get_request` | `{"request":"#7b POST sign","fields":["url","headers"]}` | 231 | 57 | — |
 | 15 | `search` | `{"q":"sign"}` | 740 | 185 | — |
 
-Totales: `tools/list` ≈ 1 608 tokens (una vez por sesión) + 15 respuestas ≈ 1 818 tokens (las
+Totales: `tools/list` ≈ 1 675 tokens (una vez por sesión) + 15 respuestas ≈ 1 818 tokens (las
 respuestas de esta colección llevan el resultado de sus tests y su consola). Lo que el modelo escribe
 en cada llamada son 30–90 caracteres de argumentos: referencia la petición por nombre y no reescribe
 URL, cabeceras, token ni JSON.

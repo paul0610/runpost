@@ -53,13 +53,13 @@ Gateway (detalle en [docs/BENCH.md](docs/BENCH.md)):
 
 | Qué | RunPost |
 |---|---|
-| `tools/list` completo (13 tools, una vez por sesión) | ≈ 1 608 tokens |
-| `run_request` "00.2 Gateway - ping" | 201 caracteres ≈ 50 tokens |
+| `tools/list` completo (13 tools, una vez por sesión) | ≈ 1 675 tokens |
+| `run_request` "00.2 Gateway - ping" | ≈ 200 caracteres ≈ 50 tokens |
 | `run_request` con `select` a un campo | < 60 tokens |
 | Una respuesta JSON típica de 5 KB | < 700 tokens (minificada, truncada, el resto a demanda) |
 | Coste fijo del plugin de Claude Code | ≈ 112 tokens (+ ≈ 630 cuando se usa la skill) |
-| App de escritorio en Windows 11: tamaño, arranque hasta la ventana usable, memoria en reposo | 19,1 MB, ≈ 1,1 s, ≈ 37 MB (más el WebView del sistema) |
-| CLI / servidor MCP: tamaño, arranque hasta `initialize` | 16,4 MB, ≈ 53 ms |
+| App de escritorio en Windows 11: tamaño, arranque hasta la ventana usable, memoria en reposo | 20,5 MB, 1,25–1,45 s, 35–37 MB (más el WebView del sistema) |
+| CLI / servidor MCP: tamaño, arranque hasta `initialize` | 17,9 MB, ≈ 75 ms |
 | Sesión completa de Claude Code, curl frente a RunPost | en medición: el arnés está en `scripts/bench/` (ver [docs/BENCH.md](docs/BENCH.md)) |
 
 ## Instalar
@@ -67,7 +67,9 @@ Gateway (detalle en [docs/BENCH.md](docs/BENCH.md)):
 Descarga desde [Releases](https://github.com/paul0610/runpost/releases/latest). Los binarios aún no
 están firmados, así que el primer arranque pide confirmación.
 
-**Windows** (PowerShell; instalación por usuario en `%LOCALAPPDATA%\RunPost`, con `runpost_mcp.exe`):
+**Windows**: descarga `RunPost_0.2.0_x64-setup.exe` y ábrelo con doble clic. Se instala para tu
+usuario en `%LOCALAPPDATA%\RunPost` (sin permisos de administrador), con `runpost_mcp.exe`, y queda en
+el menú Inicio. `RunPost_0.2.0_x64-portable.exe` funciona sin instalar. O, en PowerShell:
 
 ```powershell
 Invoke-WebRequest https://github.com/paul0610/runpost/releases/download/v0.2.0/RunPost_0.2.0_x64-setup.exe -OutFile RunPost-setup.exe
@@ -116,7 +118,7 @@ con tus rutas. Ejemplos en [docs/mcp-client-configs/](docs/mcp-client-configs/),
 
 - Interfaz tipo Postman: colecciones, carpetas, pestañas, editores de params/cabeceras/cuerpo/auth,
   entornos y globales, historial, consola, documentación markdown, tema claro y oscuro, atajos de
-  Postman. En español e inglés.
+  Postman. En español e inglés (Ajustes → Idioma).
 - Importar desde Postman v2.1, OpenAPI 3, HAR, Insomnia (v4 y v5), Bruno (`.bru`, YAML o JSON) y
   cURL ([qué se traduce](docs/IMPORT.md)); exportar a Postman v2.1. Snippets de código (cURL, fetch,
   PowerShell, Python) que dejan los secretos como `{{variables}}`, y cuerpos GraphQL
@@ -194,7 +196,7 @@ scripts\dev.bat
 
 `start-ui` abre la ventana nativa (1280×800, mínimo 900×600): árbol de colecciones, pestañas,
 constructor de
-petición (Params, Auth, Headers, Body, Scripts, Ajustes), visor de respuesta, tema
+petición (Params, Auth, Headers, Body, Scripts, Ajustes, Docs y Ejemplos), visor de respuesta, tema
 claro/oscuro/sistema y atajos de Postman (`Ctrl+Enter`, `Ctrl+S`, `Ctrl+T`, `Ctrl+W`,
 `Ctrl+K`, `Ctrl+B`, `Ctrl+,`, `Ctrl+E`, `Ctrl+Alt+C`, `Ctrl+Shift+L`). En el primer arranque, el
 estado vacío ofrece **Importar de Postman**, **Nueva petición** y **Conectar tu agente**.
@@ -202,7 +204,10 @@ Además: gestor de entornos y globales (`Variable | Valor | Secreto | 🔒`, los
 se ven `••••••••` hasta pulsar el ojo), historial (abrir, guardar en una colección, vaciar),
 **Consola** en el panel inferior con la petición resuelta y los secretos como `***`, pestaña
 **Docs** en markdown, y en el menú contextual **Exportar** (con "Quitar secretos" marcado) y
-**Copiar como curl** (los secretos quedan como `{{variable}}`). Todo se maneja también con teclado.
+**Copiar como curl** (los secretos quedan como `{{variable}}`). El botón `</>` muestra la petición
+como cURL, fetch, PowerShell o Python; **Importar** acepta un cURL pegado o archivos; clic derecho en
+una colección → **Buscar y reemplazar…**; y lo que borras va a la **Papelera** (al pie del panel), con
+**Deshacer**. Todo se maneja también con teclado.
 Instancia única, tamaño y posición recordados; cerrar la app detiene su servidor.
 El modo navegador (`serve-browser`) sirve la misma UI en `http://127.0.0.1:7878` hasta
 Ctrl+C. `dev` inicia Vite en `http://localhost:5173` y la ventana nativa con recarga.
@@ -318,8 +323,8 @@ está abierta también queda en el llavero del sistema para que el agente lo pid
 (`runpost_mcp.exe mcp-headers`), y se borra al cerrarla. El HTML del modo navegador lo
 incluye en su bootstrap (sin caché); los assets empaquetados de Tauri no lo contienen. Todos los binds son `127.0.0.1`, se valida `Origin` y `Host`
 y CORS permite solo los orígenes de la especificación (`localhost:5173` solo con
-`--dev`). Los datos locales y logs se crean al iniciar; los entornos locales, logs y SQLite están
-excluidos de Git.
+`--dev`). Los datos locales y logs se crean al iniciar; los entornos y colecciones locales, la
+papelera, los logs y SQLite están excluidos de Git.
 
 ### macOS y Linux
 
